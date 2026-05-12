@@ -1,32 +1,32 @@
-# Layout
+# Структура (Layout)
 
-The key to our design is the `RefCell` type. The heart of
-RefCell is a pair of methods:
+Ключом к нашему дизайну является тип `RefCell`. Сердцем
+`RefCell` является пара методов:
 
 ```rust ,ignore
 fn borrow(&self) -> Ref<'_, T>;
 fn borrow_mut(&self) -> RefMut<'_, T>;
 ```
 
-The rules for `borrow` and `borrow_mut` are exactly those of `&` and `&mut`:
-you can call `borrow` as many times as you want, but `borrow_mut` requires
-exclusivity.
+Правила для `borrow` и `borrow_mut` точно такие же, как для `&` и `&mut`:
+вы можете вызывать `borrow` столько раз, сколько захотите, но `borrow_mut` требует
+монопольного доступа (exclusivity).
 
-Rather than enforcing this statically, RefCell enforces them at runtime.
-If you break the rules, RefCell will just panic and crash the program.
-Why does it return these Ref and RefMut things? Well, they basically behave
-like `Rc`s but for borrowing. They also keep the RefCell borrowed until they go out
-of scope. We'll get to that later.
+Вместо того чтобы обеспечивать соблюдение этих правил статически, `RefCell` делает это во время выполнения (at runtime).
+Если вы нарушите правила, `RefCell` просто запаникует и аварийно завершит программу.
+Почему он возвращает эти штуки `Ref` и `RefMut`? Ну, они ведут себя в основном
+как `Rc`, но для заимствования. Они также удерживают `RefCell` заимствованным, пока не выйдут
+из области видимости. Мы вернемся к этому позже.
 
-Now with Rc and RefCell we can become... an incredibly verbose pervasively
-mutable garbage collected language that can't collect cycles! Y-yaaaaay...
+Теперь с `Rc` и `RefCell` мы можем стать... невероятно многословным языком
+с повсеместной изменяемостью и сборкой мусора, который не умеет собирать циклы! У-ррррааа...
 
-Alright, we want to be *doubly-linked*. This means each node has a pointer to
-the previous and next node. Also, the list itself has a pointer to the
-first and last node. This gives us fast insertion and removal on *both*
-ends of the list.
+Хорошо, мы хотим сделать список *двусвязным*. Это означает, что каждый узел имеет указатель на
+предыдущий и следующий узлы. Кроме того, сам список имеет указатель на
+первый и последний узлы. Это дает нам быструю вставку и удаление на *обоих*
+концах списка.
 
-So we probably want something like:
+Поэтому мы, вероятно, хотим что-то вроде этого:
 
 ```rust ,ignore
 use std::rc::Rc;
@@ -82,4 +82,4 @@ warning: field is never used: `prev`
    |     ^^^^^^^^^^^^^
 ```
 
-Hey, it built! Lots of dead code warnings, but it built! Let's try to use it.
+Эй, оно скомпилировалось! Полно предупреждений о мертвом коде, но скомпилировалось! Давайте попробуем это использовать.

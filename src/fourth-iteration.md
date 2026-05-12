@@ -1,11 +1,11 @@
-# Iteration
+# Итерация (Iteration)
 
-Let's take a crack at iterating this bad-boy.
+Давайте попробуем итерировать этого плохиша.
 
 ## IntoIter
 
-IntoIter, as always, is going to be the easiest. Just wrap the stack and
-call `pop`:
+`IntoIter`, как всегда, будет самым простым. Просто оберните стек и
+вызывайте `pop`:
 
 ```rust ,ignore
 pub struct IntoIter<T>(List<T>);
@@ -24,27 +24,26 @@ impl<T> Iterator for IntoIter<T> {
 }
 ```
 
-But we have an interesting new development. Where previously there was only
-ever one "natural" iteration order for our lists, a Deque is inherently
-bi-directional. What's so special about front-to-back? What if someone wants
-to iterate in the other direction?
+Но у нас есть интересное новое развитие событий. Если раньше для наших списков
+существовал только один «естественный» порядок итерации, то дека по своей сути
+двунаправленная. Что такого особенного в порядке «от начала к концу»? Что, если кто-то захочет
+итерироваться в другом направлении?
 
-Rust actually has an answer to this: `DoubleEndedIterator`. DoubleEndedIterator
-*inherits* from Iterator (meaning all DoubleEndedIterator are Iterators) and
-requires one new method: `next_back`. It has the exact same signature as
-`next`, but it's supposed to yield elements from the other end. The semantics
-of DoubleEndedIterator are super convenient for us: the iterator becomes a
-deque. You can consume elements from the front and back until the two ends
-converge, at which point the iterator is empty.
+У Rust на самом деле есть ответ на это: `DoubleEndedIterator`. `DoubleEndedIterator`
+*наследуется* от `Iterator` (что означает, что все `DoubleEndedIterator` являются итераторами) и
+требует одного нового метода: `next_back`. Он имеет точно такую же сигнатуру, как и
+`next`, но предполагается, что он будет возвращать элементы с другого конца. Семантика
+`DoubleEndedIterator` очень удобна для нас: итератор становится
+декой. Вы можете потреблять элементы с начала и с конца, пока оба конца не
+сойдутся, после чего итератор станет пустым.
 
-Much like Iterator and `next`, it turns out that `next_back` isn't really
-something consumers of the DoubleEndedIterator really care about. Rather, the
-best part of this interface is that it exposes the `rev` method, which wraps
-up the iterator to make a new one that yields the elements in reverse order.
-The semantics of this are fairly straight-forward: calls to `next` on the
-reversed iterator are just calls to `next_back`.
+Как и в случае с `Iterator` и `next`, оказывается, что `next_back` не так уж
+сильно волнует потребителей `DoubleEndedIterator`. Скорее, лучшая часть этого интерфейса заключается в том, что он предоставляет метод `rev`, который оборачивает
+итератор, создавая новый, который возвращает элементы в обратном порядке.
+Семантика этого довольно проста: вызовы `next` для
+обратного итератора — это просто вызовы `next_back`.
 
-Anyway, because we're already a deque providing this API is pretty easy:
+В любом случае, поскольку мы уже являемся декой, предоставить этот API довольно просто:
 
 ```rust ,ignore
 impl<T> DoubleEndedIterator for IntoIter<T> {
@@ -54,7 +53,7 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 }
 ```
 
-And let's test it out:
+И давайте протестируем это:
 
 ```rust ,ignore
 #[test]
@@ -94,13 +93,13 @@ test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-Nice.
+Приятно.
 
 ## Iter
 
-Iter will be a bit less forgiving. We'll have to deal with those awful `Ref`
-things again! Because of Refs, we can't store `&Node`s like we did before.
-Instead, let's try to store `Ref<Node>`s:
+`Iter` будет чуть менее снисходительным. Нам снова придется иметь дело с этими ужасными
+штуками `Ref`! Из-за `Ref` мы не можем хранить `&Node`, как делали раньше.
+Вместо этого давайте попробуем хранить `Ref<Node>`:
 
 ```rust ,ignore
 pub struct Iter<'a, T>(Option<Ref<'a, Node<T>>>);
@@ -117,9 +116,9 @@ impl<T> List<T> {
 
 ```
 
-So far so good. Implementing `next` is going to be a bit hairy, but I think
-it's the same basic logic as the old stack IterMut but with extra RefCell
-madness:
+Пока всё идет хорошо. Реализация `next` будет немного волосатой (hairy), но я думаю,
+что здесь используется та же базовая логика, что и в старом `IterMut` для стека, но с дополнительным
+безумием `RefCell`:
 
 ```rust ,ignore
 impl<'a, T> Iterator for Iter<'a, T> {
@@ -151,24 +150,24 @@ error[E0505]: cannot move out of `node_ref` because it is borrowed
    --> src/fourth.rs:156:22
     |
 153 |     fn next(&mut self) -> Option<Self::Item> {
-    |             --------- lifetime `'1` appears in the type of `self`
-154 |         self.0.take().map(|node_ref| {
-155 |             self.0 = node_ref.next.as_ref().map(|head| head.borrow());
+154 |         |--------- lifetime `'1` appears in the type of `self`
+155 |         self.0.take().map(|node_ref| {
+156 |             self.0 = node_ref.next.as_ref().map(|head| head.borrow());
     |             ------   -------- borrow of `node_ref` occurs here
     |             |
     |             assignment requires that `node_ref` is borrowed for `'1`
-156 |             Ref::map(node_ref, |node| &node.elem)
+157 |             Ref::map(node_ref, |node| &node.elem)
     |                      ^^^^^^^^ move out of `node_ref` occurs here
 ```
 
-Shoot.
+Черт.
 
-`node_ref` doesn't live long enough. Unlike normal references, Rust doesn't let
-us just split Refs up like that. The Ref we get out of `head.borrow()` is only
-allowed to live as long as `node_ref`, but we end up trashing that in our
-`Ref::map` call.
+`node_ref` живет недостаточно долго. В отличие от обычных ссылок, Rust не позволяет
+нам просто так разделять `Ref`. `Ref`, который мы получаем из `head.borrow()`, может
+жить только столько же, сколько `node_ref`, но мы в итоге уничтожаем его в нашем
+вызове `Ref::map`.
 
-The function we want exists, and it's called *[map_split][]*:
+Функция, которая нам нужна, существует, и она называется *[map_split][]*:
 
 ```rust ,ignore
 pub fn map_split<U, V, F>(orig: Ref<'b, T>, f: F) -> (Ref<'b, U>, Ref<'b, V>) where
@@ -177,7 +176,7 @@ pub fn map_split<U, V, F>(orig: Ref<'b, T>, f: F) -> (Ref<'b, U>, Ref<'b, V>) wh
     V: ?Sized,
 ```
 
-Woof. Let's give it a try...
+Уф (Woof). Давайте попробуем...
 
 ```rust ,ignore
 fn next(&mut self) -> Option<Self::Item> {
@@ -208,11 +207,11 @@ error[E0521]: borrowed data escapes outside of closure
     |             reference to `next` escapes the closure body here
 ```
 
-Ergh. We need to `Ref::Map` again to get our lifetimes right. But `Ref::Map`
-returns a `Ref` and we need an `Option<Ref>`, but we need to go through the
-Ref to map over our Option...
+Эргх. Нам нужно снова использовать `Ref::map`, чтобы правильно настроить времена жизни. Но `Ref::map`
+возвращает `Ref`, а нам нужен `Option<Ref>`, но нам нужно пройти через
+`Ref`, чтобы применить `map` к нашему `Option`…
 
-**stares into distance for a long time**
+**долго смотрит вдаль**
 
 ??????
 
@@ -245,18 +244,18 @@ error[E0308]: mismatched types
                found type `std::cell::Ref<'_, std::cell::RefCell<fourth::Node<_>>>`
 ```
 
-Oh. Right. There's multiple RefCells. The deeper we walk into the list, the more
-nested we become under each RefCell. We would need to maintain, like, a stack of
-Refs to represent all the outstanding loans we're holding, because if we stop
-looking at an element we need to decrement the borrow-count on every RefCell that
-comes before it.................
+Ой. Точно. Здесь несколько `RefCell`. Чем глубже мы погружаемся в список, тем больше
+уровней вложенности под каждым `RefCell` мы получаем. Нам нужно было бы поддерживать что-то вроде стека
+`Ref`, чтобы представлять все выданные займы, которые мы удерживаем, потому что если мы перестаем
+смотреть на элемент, нам нужно уменьшить счетчик заимствований на каждом `RefCell`, который
+идет перед ним.....................
 
-I don't think there's anything we can do here. It's a dead end. Let's try
-getting out of the RefCells.
+Я не думаю, что мы можем что-то здесь сделать. Это тупик. Давайте попробуем
+выбраться из `RefCell`.
 
-What about our `Rc`s. Who said we even needed to store references?
-Why can't we just Clone the whole Rc to get a nice owning handle into the middle
-of the list?
+А что насчет наших `Rc`? Кто сказал, что нам вообще нужно хранить ссылки?
+Почему бы нам просто не клонировать весь `Rc`, чтобы получить хороший владеющий дескриптор в середине
+списка?
 
 ```rust ,ignore
 pub struct Iter<T>(Option<Rc<Node<T>>>);
@@ -271,59 +270,58 @@ impl<T> Iterator for Iter<T> {
     type Item =
 ```
 
-Uh... Wait what do we return now? `&T`? `Ref<T>`?
+Эээ... Подождите, а что мы теперь возвращаем? `&T`? `Ref<T>`?
 
-No, none of those work... our Iter doesn't have a lifetime anymore! Both `&T`
-and `Ref<T>` require us to declare some lifetime up front before we get into
-`next`. But anything we manage to get out of our Rc would be borrowing the
-Iterator... brain... hurt... aaaaaahhhhhh
+Нет, ни один из этих вариантов не работает... наш `Iter` больше не имеет времени жизни! И `&T`,
+и `Ref<T>` требуют от нас объявить какое-то время жизни заранее, прежде чем мы перейдем к
+`next`. Но всё, что нам удастся извлечь из нашего `Rc`, будет заимствованием
+итератора... мозг... болит... аааааааахххххх
 
-Maybe we can... map... the Rc... to get an `Rc<T>`? Is that a thing? Rc's docs
-don't seem to have anything like that. Actually someone made [a crate][own-ref]
-that lets you do that.
+Может быть, мы можем... отобразить (map)... `Rc`..., чтобы получить `Rc<T>`? Такое возможно? В документации `Rc`, похоже, нет ничего подобного. На самом деле кто-то создал [крейт own-ref][own-ref],
+который позволяет это делать.
 
-But wait, even if we do *that* then we've got an even bigger problem: the
-dreaded spectre of iterator invalidation. Previously we've been totally immune
-to iterator invalidation, because the Iter borrowed the list, leaving it totally
-immutable. However if our Iter was yielding Rcs, they wouldn't borrow the list
-at all! That means people can start calling `push` and `pop` on the list while
-they hold pointers into it!
+Но подождите, даже если мы сделаем *это*, мы столкнемся с еще большей проблемой:
+ужасным призраком инвалидации итератора (iterator invalidation). Ранее мы были полностью застрахованы
+от инвалидации итераторов, потому что `Iter` заимствовал список, оставляя его полностью
+неизменяемым. Однако если бы наш `Iter` возвращал `Rc`, они бы вообще не заимствовали список!
+Это означает, что люди могут начать вызывать `push` и `pop` для списка, пока
+они удерживают указатели на него!
 
-Oh lord, what will that do?!
+О боже, к чему это приведет?!
 
-Well, pushing is actually fine. We've got a view into some sub-range of the
-list, and the list will just grow beyond our sights. No biggie.
+Ну, добавление (`push`), на самом деле, это нормально. У нас есть представление о некотором поддиапазоне
+списка, и список просто вырастет за пределы нашего поля зрения. Ничего страшного.
 
-However `pop` is another story. If they're popping elements outside of our
-range, it should *still* be fine. We can't see those nodes so nothing will
-happen. However if they try to pop off the node we're pointing at... everything
-will blow up! In particular when they go to `unwrap` the result of the
-`try_unwrap`, it will actually fail, and the whole program will panic.
+Однако `pop` — это совсем другая история. Если они извлекают элементы за пределами нашего
+диапазона, все *по-прежнему* должно быть в порядке. Мы не видим этих узлов, так что ничего не
+произойдет. Однако если они попытаются извлечь узел, на который мы указываем... всё взорвется! В частности, когда они попытаются вызвать `unwrap` для результата
+`try_unwrap`, это фактически завершится ошибкой, и вся программа запаникует.
 
-That's actually pretty cool. We can get tons of interior owning pointers into
-the list and mutate it at the same time *and it will just work* until they
-try to remove the nodes that we're pointing at. And even then we don't get
-dangling pointers or anything, the program will deterministically panic!
+Это на самом деле довольно круто. Мы можем получить кучу внутренних владеющих указателей на
+список и одновременно изменять его, *и это будет просто работать*, пока они
+не попытаются удалить узлы, на которые мы указываем. И даже тогда мы не получим
+висячих указателей или чего-то подобного, программа детерминированно запаникует!
 
-But having to deal with iterator invalidation on top of mapping Rcs just
-seems... bad. `Rc<RefCell>` has really truly finally failed us. Interestingly,
-we've experienced an inversion of the persistent stack case. Where the
-persistent stack struggled to ever reclaim ownership of the data but could get
-references all day every day, our list had no problem gaining ownership, but
-really struggled to loan our references.
+Но необходимость иметь дело с инвалидацией итераторов вдобавок к маппингу `Rc` кажется...
+плохой идеей. `Rc<RefCell>` действительно, по-настоящему окончательно подвел нас. Интересно,
+что мы столкнулись с инверсией случая персистентного стека. Если
+персистентный стек изо всех сил пытался вернуть владение данными, но мог получать
+ссылки целыми днями, то наш список без проблем получал владение, но
+действительно изо всех сил пытался выдать ссылки.
 
-Although to be fair, most of our struggles revolved around wanting to hide the
-implementation details and have a decent API. We *could* do everything fine
-if we wanted to just pass around Nodes all over the place.
+Хотя, справедливости ради, большинство наших трудностей было связано с желанием скрыть
+детали реализации и иметь приличный API. Мы *могли бы* сделать всё нормально,
+если бы хотели просто передавать `Node` повсюду.
 
-Heck, we could make multiple concurrent IterMuts that were runtime checked to
-not be mutable accessing the same element!
+Черт возьми, мы могли бы создать несколько параллельных `IterMut`, которые проверялись бы во время выполнения на предмет того, чтобы
+не иметь изменяемого доступа к одному и тому же элементу!
 
-Really, this design is more appropriate for an internal data structure that
-never makes it out to consumers of the API. Interior mutability is great for
-writing safe *applications*. Not so much safe *libraries*.
+На самом деле, такой дизайн больше подходит для внутренней структуры данных, которая
+никогда не выходит наружу к потребителям API. Внутренняя изменяемость отлично подходит для
+написания безопасных *приложений*. Не так хорошо для безопасных *библиотек*.
 
-Anyway, that's me giving up on Iter and IterMut. We could do them, but *ugh*.
+В общем, на этом я сдаюсь в попытках реализовать `Iter` и `IterMut`. Мы могли бы их сделать, но *тьфу (ugh)*.
+
 
 [own-ref]: https://crates.io/crates/owning_ref
 [map-split]: https://doc.rust-lang.org/std/cell/struct.Ref.html#method.map_split

@@ -1,17 +1,17 @@
-# A Bad but Safe Doubly-Linked Deque
+# Плохая, но безопасная двусвязная дека (A Bad but Safe Doubly-Linked Deque)
 
-Now that we've seen Rc and heard about interior mutability, this gives an
-interesting thought... maybe we *can* mutate through an Rc. And if *that's*
-the case, maybe we can implement a *doubly-linked* list totally safely!
+Теперь, когда мы увидели `Rc` и услышали о внутренней изменяемости, возникает
+интересная мысль... может быть, мы *можем* производить изменения через `Rc`. И если это
+так, то, возможно, мы сможем реализовать *двусвязный* список абсолютно безопасно!
 
-In the process we'll become familiar with *interior mutability*, and probably
-learn the hard way that safe doesn't mean *correct*. Doubly-linked lists are
-hard, and I always make a mistake somewhere.
+В процессе мы познакомимся с *внутренней изменяемостью (interior mutability)* и, вероятно,
+на горьком опыте поймем, что «безопасно» не значит «правильно». Двусвязные списки — это
+сложно, и я обязательно где-нибудь ошибусь.
 
-Let's add a new file called `fourth.rs`:
+Давайте добавим новый файл с именем `fourth.rs`:
 
 ```rust ,ignore
-// in lib.rs
+// в lib.rs
 
 pub mod first;
 pub mod second;
@@ -19,7 +19,7 @@ pub mod third;
 pub mod fourth;
 ```
 
-This will be another clean-room operation, though as usual we'll probably find
-some logic that applies verbatim again.
+Это будет еще одна операция «с чистого листа» (clean-room operation), хотя, как обычно, мы, вероятно, найдем
+какую-то логику, которая снова применима буквально.
 
-Disclaimer: this chapter is basically a demonstration that this is a very bad idea.
+Отказ от ответственности (Disclaimer): эта глава, по сути, является демонстрацией того, что это очень плохая идея.

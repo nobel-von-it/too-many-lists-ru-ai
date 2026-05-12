@@ -1,22 +1,22 @@
-# Final Code
+# Итоговый код (Final Code)
 
-Alright, so that's implementing a 100% safe doubly-linked list in Rust. It was
-a nightmare to implement, leaks implementation details, and doesn't support several
-fundamental operations.
+Итак, это была реализация на 100% безопасного двусвязного списка на Rust. Это был
+кошмар в плане реализации, наружу утекают детали реализации, и он не поддерживает несколько
+фундаментальных операций.
 
-But, it exists.
+Но он существует.
 
-Oh, I guess it's also riddled with tons of "unnecessary" runtime checks for
-correctness between `Rc` and `RefCell`. I put unnecessary in quotes because
-they're actually necessary to guarantee the whole *actually being safe* thing.
-We encountered a few places where those checks actually *were* necessary.
-Doubly-linked lists have a horribly tangled aliasing and ownership story!
+О, я полагаю, он также пронизан кучей «ненужных» проверок во время выполнения для
+обеспечения корректности между `Rc` и `RefCell`. Я взял «ненужных» в кавычки, потому что
+на самом деле они необходимы, чтобы гарантировать всю эту вещь с *реальной безопасностью*.
+Мы столкнулись с несколькими местами, где эти проверки действительно *были* необходимы.
+У двусвязных списков ужасно запутанная история с алиасингом и владением!
 
-Still, it's a thing we can do. Especially if we don't care about exposing
-internal data structures to our consumers.
+Тем не менее, это то, что мы можем сделать. Особенно если нас не волнует раскрытие
+внутренних структур данных нашим потребителям.
 
-From here on out, we're going to be focusing on other side of this coin:
-getting back all the control by making our implementation *unsafe*.
+С этого момента мы сосредоточимся на другой стороне этой медали:
+вернем себе полный контроль, сделав нашу реализацию *небезопасной (unsafe)*.
 
 ```rust
 use std::rc::Rc;
@@ -170,53 +170,53 @@ mod test {
     fn basics() {
         let mut list = List::new();
 
-        // Check empty list behaves right
+        // Проверяем, что пустой список ведет себя правильно
         assert_eq!(list.pop_front(), None);
 
-        // Populate list
+        // Заполняем список
         list.push_front(1);
         list.push_front(2);
         list.push_front(3);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop_front(), Some(3));
         assert_eq!(list.pop_front(), Some(2));
 
-        // Push some more just to make sure nothing's corrupted
+        // Добавляем еще немного, чтобы убедиться, что ничего не испортилось
         list.push_front(4);
         list.push_front(5);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop_front(), Some(5));
         assert_eq!(list.pop_front(), Some(4));
 
-        // Check exhaustion
+        // Проверяем исчерпание списка
         assert_eq!(list.pop_front(), Some(1));
         assert_eq!(list.pop_front(), None);
 
         // ---- back -----
 
-        // Check empty list behaves right
+        // Проверяем, что пустой список ведет себя правильно
         assert_eq!(list.pop_back(), None);
 
-        // Populate list
+        // Заполняем список
         list.push_back(1);
         list.push_back(2);
         list.push_back(3);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop_back(), Some(3));
         assert_eq!(list.pop_back(), Some(2));
 
-        // Push some more just to make sure nothing's corrupted
+        // Добавляем еще немного, чтобы убедиться, что ничего не испортилось
         list.push_back(4);
         list.push_back(5);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop_back(), Some(5));
         assert_eq!(list.pop_back(), Some(4));
 
-        // Check exhaustion
+        // Проверяем исчерпание списка
         assert_eq!(list.pop_back(), Some(1));
         assert_eq!(list.pop_back(), None);
     }
