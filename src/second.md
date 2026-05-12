@@ -1,28 +1,28 @@
-# An Ok Singly-Linked Stack
+# Нормальный односвязный стек (An Ok Singly-Linked Stack)
 
-In the previous chapter we wrote up a minimum viable singly-linked
-stack. However there's a few design decisions that make it kind of sucky.
-Let's make it less sucky. In doing so, we will:
+В предыдущей главе мы написали минимально жизнеспособный односвязный
+стек. Однако есть несколько проектных решений, из-за которых он получился так себе.
+Давайте сделаем его лучше. При этом мы:
 
-* Deinvent the wheel
-* Make our list able to handle any element type
-* Add peeking
-* Make our list iterable
+* Перестанем изобретать велосипед (Deinvent the wheel)
+* Сделаем наш список способным работать с любым типом элементов
+* Добавим просмотр (peeking)
+* Сделаем наш список итерируемым (iterable)
 
-And in the process we'll learn about
+И в процессе мы узнаем о:
 
-* Advanced Option use
-* Generics
-* Lifetimes
-* Iterators
+* Продвинутом использовании `Option`
+* Обобщениях (Generics)
+* Временах жизни (Lifetimes)
+* Итераторах (Iterators)
 
-Let's add a new file called `second.rs`:
+Давайте добавим новый файл с именем `second.rs`:
 
 ```rust ,ignore
-// in lib.rs
+// в lib.rs
 
 pub mod first;
 pub mod second;
 ```
 
-And copy everything from `first.rs` into it.
+И скопируем в него всё из `first.rs`.

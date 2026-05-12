@@ -1,11 +1,11 @@
-# Making it all Generic
+# Делаем всё обобщенным (Making it all Generic)
 
-We've already touched a bit on generics with Option and Box. However so
-far we've managed to avoid declaring any new type that is actually generic
-over arbitrary elements.
+Мы уже немного коснулись обобщений (generics) в разговоре об `Option` и `Box`. Однако до
+сих пор нам удавалось избегать объявления каких-либо новых типов, которые на самом деле были бы обобщенными
+для произвольных элементов.
 
-It turns out that's actually really easy. Let's make all of our types generic
-right now:
+Оказывается, это очень просто. Давайте сделаем все наши типы обобщенными
+прямо сейчас:
 
 ```rust ,ignore
 pub struct List<T> {
@@ -20,10 +20,9 @@ struct Node<T> {
 }
 ```
 
-You just make everything a little more pointy, and suddenly your code is
-generic. Of course, we can't *just* do this, or else the compiler's going
-to be Super Mad.
-
+Вы просто делаете все немного более «угловатым» (с использованием угловых скобок), и внезапно ваш код становится
+обобщенным. Конечно, мы не можем *просто* сделать это, иначе компилятор будет
+Супер Зол.
 
 ```text
 > cargo test
@@ -42,13 +41,13 @@ error[E0107]: wrong number of type arguments: expected 1, found 0
 
 ```
 
-The problem is pretty clear: we're talking about this `List` thing but that's not
-real anymore. Like Option and Box, we now always have to talk about
-`List<Something>`.
+Проблема вполне понятна: мы говорим об этой штуке `List`, но ее больше не существует в таком виде.
+Как и в случае с `Option` и `Box`, теперь мы всегда должны говорить о
+`List<Something>` (Список чего-то).
 
-But what's the Something we use in all these impls? Just like List, we want our
-implementations to work with *all* the T's. So, just like List, let's make our
-`impl`s pointy:
+Но что это за «что-то» (Something), которое мы используем во всех этих блоках `impl`? Так же, как и для `List`, мы хотим, чтобы наши
+реализации работали со *всеми* типами `T`. Итак, как и в случае с `List`, давайте сделаем наши
+`impl` «угловатыми»:
 
 
 ```rust ,ignore
@@ -84,7 +83,7 @@ impl<T> Drop for List<T> {
 }
 ```
 
-...and that's it!
+...и это всё!
 
 
 ```text
@@ -100,9 +99,9 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-All of our code is now completely generic over arbitrary values of T. Dang,
-Rust is *easy*. I'd like to make a particular shout-out to `new` which didn't
-even change:
+Весь наш код теперь полностью обобщен для произвольных значений `T`. Черт возьми,
+Rust — это *просто*. Я хотел бы выразить особую благодарность методу `new`, который даже
+не изменился:
 
 ```rust ,ignore
 pub fn new() -> Self {
@@ -110,9 +109,9 @@ pub fn new() -> Self {
 }
 ```
 
-Bask in the Glory that is Self, guardian of refactoring and copy-pasta coding.
-Also of interest, we don't write `List<T>` when we construct an instance of
-list. That part's inferred for us based on the fact that we're returning it
-from a function that expects a `List<T>`.
+Грейтесь в лучах славы `Self`, хранителя рефакторинга и копипаст-программирования.
+Также интересно, что мы не пишем `List<T>`, когда создаем экземпляр
+списка. Эта часть выводится (inferred) за нас на основе того факта, что мы возвращаем ее
+из функции, которая ожидает `List<T>`.
 
-Alright, let's move on to totally new *behaviour*!
+Хорошо, давайте перейдем к совершенно новому *поведению*!

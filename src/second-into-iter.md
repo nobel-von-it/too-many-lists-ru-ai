@@ -1,7 +1,7 @@
 # IntoIter
 
-Collections are iterated in Rust using the *Iterator* trait. It's a bit more
-complicated than `Drop`:
+Итерация по коллекциям в Rust осуществляется с помощью типажа *Iterator*. Он немного сложнее,
+чем `Drop`:
 
 ```rust ,ignore
 pub trait Iterator {
@@ -10,33 +10,33 @@ pub trait Iterator {
 }
 ```
 
-The new kid on the block here is `type Item`. This is declaring that every
-implementation of Iterator has an *associated type* called Item. In this case,
-this is the type that it can spit out when you call `next`.
+Новым элементом здесь является `type Item`. Это объявление того, что каждая
+реализация `Iterator` имеет *ассоциированный тип (associated type)* под названием `Item`. В данном случае
+это тип, который функция может выдать вам при вызове `next`.
 
-The reason Iterator yields `Option<Self::Item>` is because the interface
-coalesces the `has_next` and `get_next` concepts. When you have the next value,
-you yield
-`Some(value)`, and when you don't you yield `None`. This makes the
-API generally more ergonomic and safe to use and implement, while avoiding
-redundant checks and logic between `has_next` and `get_next`. Nice!
+Причина, по которой `Iterator` возвращает `Option<Self::Item>`, заключается в том, что интерфейс
+объединяет понятия `has_next` (есть ли следующий) и `get_next` (получить следующий). Когда у вас есть следующее значение,
+вы возвращаете
+`Some(value)`, а когда его нет — `None`. Это делает
+API в целом более эргономичным, безопасным в использовании и реализации, позволяя избежать
+избыточных проверок и логики между `has_next` и `get_next`. Отлично!
 
-Sadly, Rust has nothing like a `yield` statement (yet), so we're going to have to
-implement the logic ourselves. Also, there's actually 3 different kinds of
-iterator each collection should endeavour to implement:
+К сожалению, в Rust (пока) нет ничего похожего на оператор `yield`, поэтому нам придется
+реализовывать логику самостоятельно. Кроме того, на самом деле существует 3 различных вида
+итераторов, которые должна стараться реализовать каждая коллекция:
 
-* IntoIter - `T`
-* IterMut - `&mut T`
-* Iter - `&T`
+* `IntoIter` — `T` (по значению)
+* `IterMut` — `&mut T` (по изменяемой ссылке)
+* `Iter` — `&T` (по разделяемой ссылке)
 
-We actually already have all the tools to implement
-IntoIter using List's interface: just call `pop` over and over. As such, we'll
-just implement IntoIter as a newtype wrapper around List:
+У нас уже есть все инструменты для реализации
+`IntoIter` с использованием интерфейса `List`: просто вызывайте `pop` снова и снова. Поэтому мы
+просто реализуем `IntoIter` как обертку нового типа (newtype wrapper) вокруг `List`:
 
 
 ```rust ,ignore
-// Tuple structs are an alternative form of struct,
-// useful for trivial wrappers around other types.
+// Кортежные структуры (Tuple structs) — это альтернативная форма структур,
+// полезная для создания простых оберток вокруг других типов.
 pub struct IntoIter<T>(List<T>);
 
 impl<T> List<T> {
@@ -48,13 +48,13 @@ impl<T> List<T> {
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
-        // access fields of a tuple struct numerically
+        // доступ к полям кортежной структуры осуществляется по номерам
         self.0.pop()
     }
 }
 ```
 
-And let's write a test:
+И давайте напишем тест:
 
 ```rust ,ignore
 #[test]
@@ -85,4 +85,4 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-Nice!
+Отлично!

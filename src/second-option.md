@@ -1,7 +1,7 @@
-# Using Option
+# Использование Option (Using Option)
 
-Particularly observant readers may have noticed that we actually reinvented
-a really bad version of Option:
+Особенно наблюдательные читатели могли заметить, что мы фактически заново изобрели
+очень плохую версию `Option`:
 
 ```rust ,ignore
 enum Link {
@@ -10,12 +10,12 @@ enum Link {
 }
 ```
 
-Link is just `Option<Box<Node>>`. Now, it's nice not to have to write
-`Option<Box<Node>>` everywhere, and unlike `pop`, we're not exposing this
-to the outside world, so maybe it's fine. However Option has some *really
-nice* methods that we've been manually implementing ourselves. Let's *not*
-do that, and replace everything with Options. First, we'll do it naively
-by just renaming everything to use Some and None:
+`Link` — это просто `Option<Box<Node>>`. Конечно, приятно не писать
+`Option<Box<Node>>` повсюду, и, в отличие от `pop`, мы не выставляем это
+внешнему миру, так что, возможно, все в порядке. Однако у `Option` есть несколько *очень
+приятных* методов, которые мы реализовывали вручную. Давайте *не будем*
+этого делать и заменим все на `Option`. Сначала мы сделаем это наивно,
+просто переименовав все для использования `Some` и `None`:
 
 ```rust ,ignore
 use std::mem;
@@ -24,7 +24,7 @@ pub struct List {
     head: Link,
 }
 
-// yay type aliases!
+// ура, псевдонимы типов (type aliases)!
 type Link = Option<Box<Node>>;
 
 struct Node {
@@ -67,10 +67,10 @@ impl Drop for List {
 }
 ```
 
-This is marginally better, but the big wins will come from Option's methods.
+Это немного лучше, но главные преимущества мы получим от методов `Option`.
 
-First, `mem::replace(&mut option, None)` is such an incredibly
-common idiom that Option actually just went ahead and made it a method: `take`.
+Во-первых, `mem::replace(&mut option, None)` — это настолько невероятно
+распространенная идиома, что в `Option` ее просто взяли и сделали методом: `take`.
 
 ```rust ,ignore
 pub struct List {
@@ -119,16 +119,16 @@ impl Drop for List {
 }
 ```
 
-Second, `match option { None => None, Some(x) => Some(y) }` is such an
-incredibly common idiom that it was called `map`. `map` takes a function to
-execute on the `x` in the `Some(x)` to produce the `y` in `Some(y)`. We could
-write a proper `fn` and pass it to `map`, but we'd much rather write what to
-do *inline*.
+Во-вторых, `match option { None => None, Some(x) => Some(y) }` — это настолько
+невероятно распространенная идиома, что ее назвали `map`. `map` принимает функцию для
+выполнения над `x` в `Some(x)`, чтобы получить `y` в `Some(y)`. Мы могли бы
+написать полноценную функцию (`fn`) и передать ее в `map`, но мы бы предпочли написать то, что нужно
+сделать, *прямо на месте (inline)*.
 
-The way to do this is with a *closure*. Closures are anonymous functions with
-an extra super-power: they can refer to local variables *outside* the closure!
-This makes them super useful for doing all sorts of conditional logic. The
-only place we do a `match` is in `pop`, so let's just rewrite that:
+Способ сделать это — использовать *замыкание (closure)*. Замыкания — это анонимные функции с
+дополнительной суперсилой: они могут ссылаться на локальные переменные *вне* замыкания!
+Это делает их суперполезными для выполнения всевозможной условной логики. Единственное
+место, где мы используем `match` — это `pop`, так что давайте просто перепишем его:
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -139,7 +139,7 @@ pub fn pop(&mut self) -> Option<i32> {
 }
 ```
 
-Ah, much better. Let's make sure we didn't break anything:
+Ах, так гораздо лучше. Давайте убедимся, что мы ничего не сломали:
 
 ```text
 > cargo test
@@ -154,4 +154,4 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-Great! Let's move on to actually improving the code's *behaviour*.
+Отлично! Давайте перейдем к фактическому улучшению *поведения* кода.

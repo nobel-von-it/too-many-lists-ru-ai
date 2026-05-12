@@ -1,8 +1,8 @@
-# Peek
+# Просмотр (Peek)
 
-One thing we didn't even bother to implement last time was peeking. Let's go
-ahead and do that. All we need to do is return a reference to the element in
-the head of the list, if it exists. Sounds easy, let's try:
+Одна вещь, которую мы даже не удосужились реализовать в прошлый раз, — это просмотр (peeking). Давайте
+сделаем это. Все, что нам нужно сделать, — это вернуть ссылку на элемент в
+заголовке списка, если он существует. Звучит просто, давайте попробуем:
 
 ```rust ,ignore
 pub fn peek(&self) -> Option<&T> {
@@ -31,12 +31,12 @@ error[E0507]: cannot move out of borrowed content
 
 ```
 
-*Sigh*. What now, Rust?
+*Вздох*. Что теперь, Rust?
 
-Map takes `self` by value, which would move the Option out of the thing it's in.
-Previously this was fine because we had just `take`n it out, but now we actually
-want to leave it where it was. The *correct* way to handle this is with the
-`as_ref` method on Option, which has the following definition:
+`map` принимает `self` по значению, что переместило бы `Option` из того места, где он находится.
+Раньше это было нормально, потому что мы только что забрали (`take`) его, но теперь мы действительно
+хотим оставить его на месте. *Правильный* способ справиться с этим — использовать метод
+`as_ref` для `Option`, который имеет следующее определение:
 
 ```rust ,ignore
 impl<T> Option<T> {
@@ -44,10 +44,10 @@ impl<T> Option<T> {
 }
 ```
 
-It demotes the `Option<T>` to an Option to a reference to its internals. We could
-do this ourselves with an explicit match but *ugh no*. It does mean that we
-need to do an extra dereference to cut through the extra indirection, but
-thankfully the `.` operator handles that for us.
+Он понижает `Option<T>` до Option со ссылкой на его внутренности. Мы могли бы
+сделать это сами с помощью явного `match`, но *фу, нет*. Это означает, что нам
+нужно сделать дополнительное разыменование, чтобы пробиться сквозь лишнюю косвенность, но,
+к счастью, оператор `.` делает это за нас.
 
 
 ```rust ,ignore
@@ -64,9 +64,9 @@ cargo build
     Finished dev [unoptimized + debuginfo] target(s) in 0.32s
 ```
 
-Nailed it.
+В точку.
 
-We can also make a *mutable* version of this method using `as_mut`:
+Мы также можем создать *изменяемую* версию этого метода, используя `as_mut`:
 
 ```rust ,ignore
 pub fn peek_mut(&mut self) -> Option<&mut T> {
@@ -81,9 +81,9 @@ pub fn peek_mut(&mut self) -> Option<&mut T> {
 
 ```
 
-EZ
+Изи (EZ).
 
-Don't forget to test it:
+Не забудьте протестировать это:
 
 ```rust ,ignore
 #[test]
@@ -112,7 +112,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-That's nice, but we didn't really test to see if we could mutate that `peek_mut` return value, did we?  If a reference is mutable but nobody mutates it, have we really tested the mutability?  Let's try using `map` on this `Option<&mut T>` to put a profound value in:
+Это мило, но мы ведь не совсем проверили, можем ли мы изменять возвращаемое значение `peek_mut`, не так ли? Если ссылка изменяемая, но никто ее не изменяет, действительно ли мы протестировали изменяемость? Давайте попробуем использовать `map` для этого `Option<&mut T>`, чтобы записать туда глубокомысленное значение:
 
 ```rust ,ignore
 #[test]
@@ -148,7 +148,7 @@ error[E0384]: cannot assign twice to immutable variable `value`
     |             ^^^^^^^^^^ cannot assign twice to immutable variable          ^~~~~
 ```
 
-The compiler is complaining that `value` is immutable, but we pretty clearly wrote `&mut value`; what gives? It turns out that writing the argument of the closure that way doesn't specify that `value` is a mutable reference. Instead, it creates a pattern that will be matched against the argument to the closure; `|&mut value|` means "the argument is a mutable reference, but just copy the value it points to into `value`, please."  If we just use `|value|`, the type of `value` will be `&mut i32` and we can actually mutate the head:
+Компилятор жалуется, что `value` неизменяема, но мы довольно четко написали `&mut value`; в чем дело? Оказывается, такое написание аргумента замыкания не указывает на то, что `value` является изменяемой ссылкой. Вместо этого оно создает шаблон (pattern), который будет сопоставляться с аргументом замыкания; `|&mut value|` означает: «аргумент является изменяемой ссылкой, но просто скопируй значение, на которое он указывает, в `value`, пожалуйста». Если мы просто используем `|value|`, типом `value` будет `&mut i32`, и мы действительно сможем изменить заголовок:
 
 ```rust ,ignore
     #[test]
@@ -184,4 +184,4 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-Much better!
+Так гораздо лучше!
