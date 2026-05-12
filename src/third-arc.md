@@ -1,68 +1,67 @@
 # Arc
 
-One reason to use an immutable linked list is to share data across threads.
-After all, shared mutable state is the root of all evil, and one way to solve
-that is to kill the *mutable* part forever.
+Одна из причин использовать неизменяемый связанный список — это совместное использование данных между потоками.
+В конце концов, разделяемое изменяемое состояние — корень всех зол, и один из способов решить
+эту проблему — навсегда убить *изменяемую* часть.
 
-Except our list isn't thread-safe at all. In order to be thread-safe, we need
-to fiddle with reference counts *atomically*. Otherwise, two threads could
-try to increment the reference count, *and only one would happen*. Then the
-list could get freed too soon!
+Вот только наш список совсем не потокобезопасен. Чтобы быть потокобезопасными, нам нужно
+изменять счетчики ссылок *атомарно*. В противном случае два потока могли бы
+попытаться увеличить счетчик ссылок, *и произошло бы только одно увеличение*. Тогда
+список мог бы освободиться слишком рано!
 
-In order to get thread safety, we have to use *Arc*. Arc is completely identical
-to Rc except for the fact that reference counts are modified atomically. This
-has a bit of overhead if you don't need it, so Rust exposes both.
-All we need to do to make our list is replace every reference to Rc with
-`std::sync::Arc`. That's it. We're thread safe. Done!
+Чтобы получить потокобезопасность, мы должны использовать *Arc*. `Arc` абсолютно идентичен
+`Rc`, за исключением того факта, что счетчики ссылок изменяются атомарно. Это
+влечет за собой небольшие накладные расходы, если вам это не нужно, поэтому Rust предоставляет оба варианта.
+Все, что нам нужно сделать для создания нашего списка, — это заменить каждое упоминание `Rc` на
+`std::sync::Arc`. Вот и всё. Мы потокобезопасны. Готово!
 
-But this raises an interesting question: how do we *know* if a type is
-thread-safe or not? Can we accidentally mess up?
+Но это поднимает интересный вопрос: как мы *узнаем*, является ли тип
+потокобезопасным или нет? Можем ли мы случайно ошибиться?
 
-No! You can't mess up thread-safety in Rust!
+Нет! Вы не можете напортачить с потокобезопасностью в Rust!
 
-The reason this is the case is because Rust models thread-safety in a
-first-class way with two traits: `Send` and `Sync`.
+Причина этого в том, что Rust моделирует потокобезопасность как
+первоклассную концепцию с помощью двух типажей: `Send` и `Sync`.
 
-A type is *Send* if it's safe to *move* to another thread. A type is *Sync* if
-it's safe to *share* between multiple threads. That is, if `T` is Sync, `&T` is
-Send. Safe in this case means it's impossible to cause *data races*, (not to
-be mistaken with the more general issue of *race conditions*).
+Тип является *Send*, если его безопасно *переместить* в другой поток. Тип является *Sync*, если
+его безопасно *разделять* между несколькими потоками. То есть, если `T` реализует `Sync`, то `&T`
+реализует `Send`. «Безопасно» в данном случае означает, что невозможно вызвать *гонки данных (data races)* (не
+путайте с более общей проблемой *состояния гонки (race conditions)*).
 
-These are marker traits, which is a fancy way of saying they're traits that
-provide absolutely no interface. You either *are* Send, or you aren't. It's just
-a property *other* APIs can require. If you aren't appropriately Send,
-then it's statically impossible to be sent to a different thread! Sweet!
+Это маркерные типажи (marker traits), что является модным способом сказать, что это типажи, которые
+не предоставляют абсолютно никакого интерфейса. Вы либо реализуете `Send`, либо нет. Это просто
+свойство, которое могут требовать *другие* API. Если вы не являетесь соответствующим образом `Send`,
+то статически невозможно отправить вас в другой поток! Круто!
 
-Send and Sync are also automatically derived traits based on whether you are
-totally composed of Send and Sync types. It's similar to how you can only
-implement Copy if you're only made of Copy types, but then we just go ahead
-and implement it automatically if you are.
+`Send` и `Sync` также являются автоматически выводимыми типажами (automatically derived traits) на основе того, состоите ли вы
+полностью из типов `Send` и `Sync`. Это похоже на то, как вы можете реализовать `Copy` только в том случае, если вы состоите только из типов `Copy`, но в этом случае мы просто берем
+и реализуем его автоматически, если это так.
 
-Almost every type is Send and Sync. Most types are Send because they totally
-own their data. Most types are Sync because the only way to share data across
-threads is to put them behind a shared reference, which makes them immutable!
+Почти каждый тип является `Send` и `Sync`. Большинство типов являются `Send`, потому что они полностью
+владеют своими данными. Большинство типов являются `Sync`, потому что единственный способ разделить данные между
+потоками — поместить их за разделяемую ссылку, что делает их неизменяемыми!
 
-However there are special types that violate these properties: those that have
-*interior mutability*. So far we've only really interacted with *inherited
-mutability* (AKA external mutability): the mutability of a value is inherited
-from the mutability of its container. That is, you can't just randomly mutate
-some field of a non-mutable value because you feel like it.
+Однако существуют особые типы, которые нарушают эти свойства: те, которые обладают
+*внутренней изменяемостью (interior mutability)*. До сих пор мы взаимодействовали только с *унаследованной
+изменяемостью (inherited mutability)* (также известной как внешняя изменяемость): изменяемость значения наследуется
+от изменяемости его контейнера. То есть вы не можете просто так случайным образом изменить
+какое-то поле неизменяемого значения только потому, что вам так захотелось.
 
-Interior mutability types violate this: they let you mutate through a shared
-reference. There are two major classes of interior mutability: cells, which
-only work in a single-threaded context; and locks, which work in a
-multi-threaded context. For obvious reasons, cells are cheaper when you can
-use them. There's also atomics, which are primitives that act like a lock.
+Типы с внутренней изменяемостью нарушают это правило: они позволяют вам производить изменения через разделяемую
+ссылку. Существует два основных класса внутренней изменяемости: ячейки (`cells`), которые
+работают только в однопоточном контексте; и блокировки (`locks`), которые работают в
+многопоточном контексте. По очевидным причинам ячейки дешевле, когда вы можете
+их использовать. Существуют также атомики, которые являются примитивами, действующими подобно блокировке.
 
-So what does all of this have to do with Rc and Arc? Well, they both use
-interior mutability for their *reference count*. Worse, this reference count
-is shared between every instance! Rc just uses a cell, which means it's not
-thread safe. Arc uses an atomic, which means it *is* thread safe. Of course,
-you can't magically make a type thread safe by putting it in Arc. Arc can only
-derive thread-safety like any other type.
+Так какое же отношение все это имеет к `Rc` и `Arc`? Что ж, они оба используют
+внутреннюю изменяемость для своего *счетчика ссылок*. Хуже того, этот счетчик ссылок
+разделяется между всеми экземплярами! `Rc` просто использует ячейку (`cell`), что означает, что он не
+потокобезопасен. `Arc` использует атомик, что означает, что он потокобезопасен. Конечно,
+вы не можете магическим образом сделать тип потокобезопасным, просто поместив его в `Arc`. `Arc` может лишь
+выводить потокобезопасность, как и любой другой тип.
 
-I really really really don't want to get into the finer details of atomic
-memory models or non-derived Send implementations. Needless to say, as you get
-deeper into Rust's thread-safety story, stuff gets more complicated. As a
-high-level consumer, it all *just works* and you don't really need to think
-about it.
+Я очень, очень, очень не хочу вдаваться в тонкости моделей атомарной
+памяти или реализаций `Send`, отличных от производных. Излишне говорить, что по мере того, как вы будете
+углубляться в историю потокобезопасности Rust, все станет намного сложнее. Как
+высокоуровневый потребитель, вы видите, что все *просто работает*, и вам действительно не нужно думать
+об этом.

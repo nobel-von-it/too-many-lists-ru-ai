@@ -1,24 +1,24 @@
-# A Persistent Singly-Linked Stack
+# Персистентный односвязный стек (A Persistent Singly-Linked Stack)
 
-Alright, we've mastered the art of mutable singly-linked stacks.
+Итак, мы освоили искусство создания изменяемых односвязных стеков.
 
-Let's move from *single* ownership to *shared* ownership by writing a
-*persistent* immutable singly-linked list. This will be exactly the list
-that functional programmers have come to know and love. You can get the
-head *or* the tail and put someone's head on someone else's tail...
-and... that's basically it. Immutability is a hell of a drug.
+Давайте перейдем от *одиночного* владения (single ownership) к *разделяемому* владению (shared ownership), написав
+*персистентный* неизменяемый односвязный список. Это будет именно тот список,
+который программисты на функциональных языках знают и любят. Вы можете получить
+голову (head) *или* хвост (tail) и поместить чью-то голову на чей-то хвост...
+и... в общем-то, это всё. Неизменяемость — та еще штука (hell of a drug).
 
-In the process we'll largely just become familiar with Rc and Arc, but this
-will set us up for the next list which will *change the game*.
+В процессе мы в основном познакомимся с `Rc` и `Arc`, но это
+подготовит нас к следующему списку, который *изменит правила игры (change the game)*.
 
-Let's add a new file called `third.rs`:
+Давайте добавим новый файл с именем `third.rs`:
 
 ```rust ,ignore
-// in lib.rs
+// в lib.rs
 
 pub mod first;
 pub mod second;
 pub mod third;
 ```
 
-No copy-pasta this time. This is a clean room operation.
+На этот раз без копипасты. Это операция «с чистого листа» (clean room operation).

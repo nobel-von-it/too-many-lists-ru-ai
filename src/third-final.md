@@ -1,7 +1,7 @@
-# Final Code
+# Итоговый код (Final Code)
 
-That's all I really have to say on the immutable stack. We're getting pretty
-good at implementing lists now!
+Это все, что я действительно хотел сказать о неизменяемом стеке. Мы уже неплохо
+справляемся с реализацией списков!
 
 ```rust
 use std::rc::Rc;
@@ -91,7 +91,7 @@ mod test {
         let list = list.tail();
         assert_eq!(list.head(), None);
 
-        // Make sure empty tail works
+        // Убеждаемся, что пустой хвост работает
         let list = list.tail();
         assert_eq!(list.head(), None);
     }
