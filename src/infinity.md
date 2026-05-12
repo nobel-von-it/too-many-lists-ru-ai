@@ -1,17 +1,17 @@
-# A Bunch of Silly Lists
+# Куча глупых списков (A Bunch of Silly Lists)
 
-Alright. That's it. We made all the lists.
+Ладно. Вот и всё. Мы сделали все списки.
 
-ahahahaha
+ахахахаха
 
-No
+Нет
 
-There's always more lists.
+Всегда есть еще списки.
 
-This chapter is a living document of the more ridiculous linked lists and how
-they interact with Rust.
+Эта глава — живой документ о более нелепых связанных списках и о том, как
+они взаимодействуют с Rust.
 
-1. [The Double Single](infinity-double-single.md)
-2. [The Stack Allocated List](infinity-stack-allocated.md)
-3. The Self-Referential Arena List?
-4. The GhostCell List?
+1. [Двойной одинарный (The Double Single)](infinity-double-single.md)
+2. [Связанный список, выделенный в стеке (The Stack-Allocated Linked List)](infinity-stack-allocated.md)
+3. Самореференциальный список на арене (The Self-Referential Arena List)?
+4. Список на GhostCell (The GhostCell List)?

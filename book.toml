@@ -1,6 +1,6 @@
 [book]
 title = "Изучение Rust с помощью слишком большого количества списков"
-author = "Aria Desires"
+authors = ["Aria Desires"]
 description = "Изучение Rust с помощью слишком большого количества списков"
 
 [build]

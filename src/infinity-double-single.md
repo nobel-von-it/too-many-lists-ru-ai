@@ -1,17 +1,17 @@
-# The Double Singly-Linked List
+# Двойной односвязный список (The Double Singly-Linked List)
 
-We struggled with doubly-linked lists because they have tangled ownership
-semantics: no node strictly owns any other node. However we struggled
-with this because we brought in our preconceived notions of what a linked
-list *is*. Namely, we assumed that all the links go in the same direction.
+Мы боролись с двусвязными списками, потому что у них запутанная семантика
+владения: ни один узел строго не владеет другим узлом. Однако мы боролись
+с этим потому, что привнесли свои предвзятые представления о том, чем
+*является* связанный список. А именно, мы предполагали, что все ссылки идут в одном направлении.
 
-Instead, we can smash our list into two halves: one going to the left,
-and one going to the right:
+Вместо этого мы можем разбить наш список на две половины: одна идет влево,
+а другая — вправо:
 
 ```rust ,ignore
 // lib.rs
 // ...
-pub mod silly1;     // NEW!
+pub mod silly1;     // НОВОЕ!
 ```
 
 ```rust ,ignore
@@ -24,11 +24,11 @@ struct List<T> {
 }
 ```
 
-Now, rather than having a mere safe stack, we have a general purpose list.
-We can grow the list leftwards or rightwards by pushing onto either stack.
-We can also "walk" along the list by popping values off one end and onto the
-other. To avoid needless allocations, we're going to copy the source of
-our safe Stack to get access to its private details:
+Теперь вместо простого безопасного стека у нас есть список общего назначения.
+Мы можем увеличивать список влево или вправо, добавляя элементы в любой из стеков.
+Мы также можем «ходить» по списку, извлекая значения с одного конца и помещая их на
+другой. Чтобы избежать ненужных выделений памяти (allocations), мы собираемся скопировать исходный код
+нашего безопасного `Stack`, чтобы получить доступ к его приватным деталям:
 
 ```rust ,ignore
 pub struct Stack<T> {
@@ -68,7 +68,7 @@ impl<T> Stack<T> {
         self.head.as_ref().map(|node| {
             &node.elem
         })
-    }
+ head   }
 
     pub fn peek_mut(&mut self) -> Option<&mut T> {
         self.head.as_mut().map(|node| {
@@ -87,7 +87,7 @@ impl<T> Drop for Stack<T> {
 }
 ```
 
-And just rework `push` and `pop` a bit:
+И просто немного переделаем `push` и `pop`:
 
 ```rust ,ignore
 pub fn push(&mut self, elem: T) {
@@ -118,7 +118,7 @@ fn pop_node(&mut self) -> Option<Box<Node<T>>> {
 }
 ```
 
-Now we can make our List:
+Теперь мы можем создать наш `List`:
 
 ```rust ,ignore
 pub struct List<T> {
@@ -133,7 +133,7 @@ impl<T> List<T> {
 }
 ```
 
-And we can do the usual stuff:
+И мы можем делать обычные вещи:
 
 
 ```rust ,ignore
@@ -147,7 +147,7 @@ pub fn peek_left_mut(&mut self) -> Option<&mut T> { self.left.peek_mut() }
 pub fn peek_right_mut(&mut self) -> Option<&mut T> { self.right.peek_mut() }
 ```
 
-But most interestingly, we can walk around!
+Но самое интересное — мы можем ходить туда-сюда!
 
 
 ```rust ,ignore
@@ -164,8 +164,7 @@ pub fn go_right(&mut self) -> bool {
 }
 ```
 
-We return booleans here as just a convenience to indicate whether we actually
-managed to move. Now let's test this baby out:
+Мы возвращаем булевы значения здесь просто для удобства, чтобы указать, удалось ли нам действительно сдвинуться. Теперь давайте протестируем эту крошку:
 
 ```rust ,ignore
 #[cfg(test)]
@@ -230,14 +229,6 @@ test silly1::test::walk_aboot ... ok
 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured
 ```
 
-This is an extreme example of a *finger* data structure, where we maintain
-some kind of finger into the structure, and as a consequence can support
-operations on locations in time proportional to the distance from the finger.
+Это экстремальный пример структуры данных с *пальцем* (finger data structure), в которой мы поддерживаем что-то вроде «пальца», указывающего внутрь структуры, и, как следствие, можем поддерживать операции над элементами за время, пропорциональное расстоянию от пальца.
 
-We can make very fast changes to the list around our finger, but if we want
-to make changes far away from our finger we have to walk all the way over there.
-We can permanently walk over there by shifting the elements from one stack to
-the other, or we could just walk along the links with an `&mut`
-temporarily to do the changes. However the `&mut` can never go back up the
-list, while our finger can!
-
+Мы можем очень быстро вносить изменения в список вокруг нашего пальца, но если мы хотим внести изменения далеко от него, нам придется идти до самого того места. Мы можем остаться там насовсем, переместив элементы из одного стека в другой, или мы могли бы просто временно пройтись по ссылкам с помощью `&mut`, чтобы внести изменения. Однако `&mut` никогда не сможет вернуться назад по списку, в то время как наш палец — может!
