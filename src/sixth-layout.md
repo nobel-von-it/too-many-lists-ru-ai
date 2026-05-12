@@ -1,28 +1,28 @@
-# Layout
+# Структура (Layout)
 
-Let us begin by first studying the structure of our enemy. A Doubly-Linked List is conceptually simple, but that's how it decieves and manipulates you. It's the same kind of linked list we've looked at over and over, but the links go both ways. Double the links, double the evil.
+Давайте начнем с изучения структуры нашего врага. Двусвязный список (Doubly-Linked List) концептуально прост, но именно так он обманывает и манипулирует вами. Это тот же самый связанный список, который мы рассматривали снова и снова, но связи идут в обоих направлениях. Вдвое больше связей — вдвое больше зла.
 
-So rather than this (gonna drop the Some/None stuff to keep it cleaner):
+Так что вместо этого (я опущу штуки с `Some`/`None`, чтобы было чище):
 
 ```text
 ... -> (A, ptr) -> (B, ptr) -> ...
 ```
 
-We have this:
+Мы имеем это:
 
 ```text
 ... <-> (ptr, A, ptr) <-> (ptr, B, ptr) <-> ...
 ```
 
-This lets you traverse the list from either direction, or seek back and forth with a [cursor](https://doc.rust-lang.org/std/collections/struct.LinkedList.html#method.cursor_back_mut).
+Это позволяет вам обходить список в любом направлении или перемещаться взад-вперед с помощью [курсора](https://doc.rust-lang.org/std/collections/struct.LinkedList.html#method.cursor_back_mut).
 
-In exchange for this flexibility, every node has to store twice as many pointers, and every operation has to fix up way more pointers. It's a significant enough complication that it's a lot easier to make a mistake, so we're going to be doing a lot of testing.
+В обмен на эту гибкость каждый узел должен хранить в два раза больше указателей, и каждая операция должна исправлять гораздо больше указателей. Это достаточно существенное усложнение, из-за которого гораздо проще совершить ошибку, поэтому мы будем проводить много тестов.
 
-You might have also noticed that I intentionally haven't drawn the *ends* of the list. This is because this is one of the places where there are genuinely defensible options for our implementation. We *definitely* need our implementation to have two pointers: one to the start of the list, and one to the end of the list.
+Вы также могли заметить, что я намеренно не нарисовал *концы* списка. Это связано с тем, что это одно из тех мест, где есть действительно оправданные варианты для нашей реализации. Нам *определенно* нужно, чтобы в нашей реализации было два указателя: один на начало списка и один на конец списка.
 
-There are two notable ways to do this in my mind: "traditional" and "dummy node".
+На мой взгляд, есть два основных способа сделать это: «традиционный» и «с фиктивным узлом» (dummy node).
 
-The traditional approach is the simple extension of how we did a Stack &mdash; just store the head and tail pointers on the stack:
+Традиционный подход — это простое расширение того, как мы делали стек — просто храните указатели на голову и хвост в стеке:
 
 ```text
 [ptr, ptr] <-> (ptr, A, ptr) <-> (ptr, B, ptr)
@@ -30,43 +30,43 @@ The traditional approach is the simple extension of how we did a Stack &mdash; j
   +----------------------------------------+
 ```
 
-This is fine, but it has one downside: corner cases. There are now two edges to our list, which means twice as many corner cases. It's easy to forget one and have a serious bug.
+Это нормально, но у него есть один недостаток: крайние случаи (corner cases). Теперь у нашего списка два края, что означает вдвое больше крайних случаев. Легко забыть один из них и получить серьезный баг.
 
-The dummy node approach attempts to smooth out these corner cases by adding an extra node to our list which contains no data but links the two ends together into a ring:
+Подход с фиктивным узлом пытается сгладить эти крайние случаи, добавляя в наш список дополнительный узел, который не содержит данных, но связывает два конца вместе в кольцо:
 
 ```text
 [ptr] -> (ptr, ?DUMMY?, ptr) <-> (ptr, A, ptr) <-> (ptr, B, ptr)
-           ^                                                 ^
-           +-------------------------------------------------+ 
+            ^                                                 ^
+            +-------------------------------------------------+ 
 ```
 
-By doing this, every node *always* has actual pointers to a previous and next node in the list. Even when you remove the last element from the list, you just end up stitching the dummy node to point at itself:
+Благодаря этому каждый узел *всегда* имеет реальные указатели на предыдущий и следующий узлы в списке. Даже когда вы удаляете последний элемент из списка, вы просто в итоге сшиваете фиктивный узел так, чтобы он указывал сам на себя:
 
 ```text
 [ptr] -> (ptr, ?DUMMY?, ptr) 
-           ^             ^
-           +-------------+
+            ^             ^
+            +-------------+
 ```
 
-There is a part of me that finds this *very* satisfying and elegant. Unfortunately, it has a couple practical problems:
+Есть часть меня, которая находит это *очень* удовлетворяющим и элегантным. К сожалению, у этого подхода есть пара практических проблем:
 
-Problem 1: An extra indirection and allocation, especially for the empty list, which must include the dummy node. Potential solutions include:
+Проблема 1: Дополнительная косвенность (indirection) и выделение памяти, особенно для пустого списка, который должен включать фиктивный узел. Потенциальные решения включают в себя:
 
-* Don't allocate the dummy node until something is inserted: simple and effective, but it adds back some of the corner cases we were trying to avoid by using dummy pointers!
+* Не выделять память под фиктивный узел до тех пор, пока что-то не будет вставлено: просто и эффективно, но это возвращает некоторые из крайних случаев, которых мы пытались избежать, используя фиктивные указатели!
 
-* Use a static copy-on-write empty singleton dummy node, with some really clever scheme that lets the Copy-On-Write checks piggy-back on normal checks: look I'm really tempted, I really do love that shit, but we can't go down that dark path in this book. Read [ThinVec's sourcecode](https://docs.rs/thin-vec/0.2.4/src/thin_vec/lib.rs.html#319-325) if you want to see that kind of perverted stuff.
+* Использовать статический пустой синглтон-узел с копированием при записи (Copy-On-Write) и какой-нибудь действительно хитрой схемой, которая позволяет проверкам Copy-On-Write «сидеть на хвосте» у обычных проверок: слушайте, я очень соблазнен, я действительно обожаю такое дерьмо, но мы не можем пойти по этому темному пути в этой книге. Почитайте [исходный код ThinVec](https://docs.rs/thin-vec/0.2.4/src/thin_vec/lib.rs.html#319-325), если хотите увидеть подобные извращения.
 
-* Store the dummy node on the stack - not practical in a language without C++-style move-constructors. I'm sure there's something weird thing we could do here with [pinning](https://doc.rust-lang.org/std/pin/index.html) but we're not gonna.
+* Хранить фиктивный узел в стеке — непрактично в языке без конструкторов перемещения в стиле C++. Я уверен, что здесь есть что-то странное, что мы могли бы сделать с помощью [закрепления (pinning)](https://doc.rust-lang.org/std/pin/index.html), но мы не будем.
 
-Problem 2: What *value* is stored in the dummy node? Sure if it's an integer it's fine, but what if we're storing a list full of `Box`? It may be impossible for us to initialized this value! Potential solutions include:
+Проблема 2: Какое *значение* хранится в фиктивном узле? Конечно, если это целое число, то всё в порядке, но что, если мы храним список, полный `Box`? Нам может быть невозможно инициализировать это значение! Потенциальные решения включают в себя:
 
-* Make every node store `Option<T>`: simple and effective, but also bloated and annoying.
+* Сделать так, чтобы каждый узел хранил `Option<T>`: просто и эффективно, но также раздуто и раздражающе.
 
-* Make every node store [`MaybeUninit<T>`](https://doc.rust-lang.org/std/mem/union.MaybeUninit.html). Horrifying and annoying.
+* Сделать так, чтобы каждый узел хранил [`MaybeUninit<T>`](https://doc.rust-lang.org/std/mem/union.MaybeUninit.html). Ужасно и раздражающе.
 
-* *Really* careful and clever inheritance-style type punning so the dummy node doesn't include the data field. This is also tempting but it's extremely dangerous and annoying. Read [BTreeMap's source](https://doc.rust-lang.org/1.55.0/src/alloc/collections/btree/node.rs.html#49-104) if you want to see that kind of perverted stuff.
+* *Очень* осторожное и умное каламбурирование типов (type punning) в стиле наследования, чтобы фиктивный узел не включал в себя поле данных. Это тоже заманчиво, но крайне опасно и раздражающе. Почитайте [исходный код BTreeMap](https://doc.rust-lang.org/1.55.0/src/alloc/collections/btree/node.rs.html#49-104), если хотите увидеть подобные извращения.
 
-The problems really outweigh the convenience for a language like Rust, so we're going to stick to the traditional layout. We'll be using the same basic design as we did for the unsafe queue in the previous chapter:
+Проблемы действительно перевешивают удобство для такого языка, как Rust, поэтому мы собираемся придерживаться традиционной структуры. Мы будем использовать тот же базовый дизайн, что и для небезопасной очереди в предыдущей главе:
 
 ```rust
 pub struct LinkedList<T> {
@@ -84,6 +84,6 @@ struct Node<T> {
 }
 ```
 
-(Now that we have reached the doubly-linked-deque, we have finally earned the right to call ourselves LinkedList, for this is the True Linked List.)
+(Теперь, когда мы добрались до двусвязной деки, мы наконец-то заслужили право называть себя `LinkedList`, ибо это и есть Настоящий Связанный Список.)
 
-This isn't quite a *true* production-quality layout yet. It's *fine* but there's magic tricks we can do to tell Rust what we're doing a bit better. To do that we're going to need to go... deeper.
+Это еще не совсем *настоящая* структура промышленного качества. Это *нормально*, но есть магические трюки, которые мы можем сделать, чтобы получше объяснить Rust, что мы делаем. Чтобы сделать это, нам нужно пойти... глубже.

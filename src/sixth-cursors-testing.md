@@ -1,8 +1,8 @@
-# Testing Cursors
+# Тестирование курсоров (Testing Cursors)
 
-Time to find out how many horribly embarassing mistakes I made in the previous section!
+Пришло время узнать, сколько ужасно постыдных ошибок я совершил в предыдущем разделе!
 
-Oh god we made our API unlike both std and the old impl. Alright well I'm just gonna hastily cobble together something from both of them. Yeah let's "borrow" these tests from std:
+О боже, мы сделали наш API непохожим ни на `std`, ни на старую реализацию. Ладно, я просто наспех слеплю что-нибудь из них обеих. Да, давайте «позаимствуем» эти тесты из `std`:
 
 ```rust ,ignore
     #[test]
@@ -64,7 +64,7 @@ Oh god we made our API unlike both std and the old impl. Alright well I'm just g
         check_links(&m);
         assert_eq!(m.iter().cloned().collect::<Vec<_>>(), &[10, 7, 1, 8, 2, 3, 4, 5, 6, 9]);
         
-        /* remove_current not impl'd
+        /* remove_current не реализован
         let mut cursor = m.cursor_mut();
         cursor.move_next();
         cursor.move_prev();
@@ -116,11 +116,11 @@ Oh god we made our API unlike both std and the old impl. Alright well I'm just g
     }
 
     fn check_links<T>(_list: &LinkedList<T>) {
-        // would be good to do this!
+        // было бы хорошо это сделать!
     }
 ```
 
-Moment of truth!
+Момент истины!
 
 ```text
 cargo test
@@ -166,9 +166,9 @@ failures:
 test result: FAILED. 12 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
 
-I'll admit, I had some hubris here and was hoping I nailed it. This is why we write tests (but maybe I just did a bad job of porting the tests..?).
+Признаюсь, во мне взыграла гордыня, и я надеялся, что справился с этим с первого раза. Вот почему мы пишем тесты (но, возможно, я просто плохо портировал тесты..?).
 
-What's the first failure?
+В чем первая ошибка?
 
 ```rust ,ignore
 let mut m: LinkedList<u32> = LinkedList::new();
@@ -183,14 +183,14 @@ assert_eq!(cursor.index(), Some(0));
 
 cursor.move_prev();
 assert_eq!(cursor.current(), None);
-assert_eq!(cursor.peek_next(), Some(&mut 1)); // DIES HERE
+assert_eq!(cursor.peek_next(), Some(&mut 1)); // УМИРАЕТ ЗДЕСЬ
 ```
 
-Geez I really messed up some basic functionality. Wait,
+Черт, я действительно испортил базовую функциональность. Погодите,
 
-> Head empty, Option methods and (omitted) compiler errors do all thinking now.
+> Голова пуста, методы `Option` и (опущенные) ошибки компилятора теперь думают за меня.
 
-Well I am nothing if not honest.
+Что ж, я как минимум честен.
 
 ```rust ,ignore
 pub fn peek_next(&mut self) -> Option<&mut T> {
@@ -202,7 +202,7 @@ pub fn peek_next(&mut self) -> Option<&mut T> {
 }
 ```
 
-...Yeah this is just wrong. If `self.cur` is None, we aren't just supposed to give up, we need to check `self.list.front` too, because we're on the ghost! So we just need to add an or_else to the chain:
+...Да, это просто неправильно. Если `self.cur` равен `None`, мы не должны просто сдаваться, нам нужно проверить еще и `self.list.front`, потому что мы находимся на призраке! Так что нам просто нужно добавить `or_else` в цепочку:
 
 ```rust ,ignore
 pub fn peek_next(&mut self) -> Option<&mut T> {
@@ -224,7 +224,7 @@ pub fn peek_prev(&mut self) -> Option<&mut T> {
 }
 ```
 
-Did that fix it?
+Это помогло?
 
 ```text
 ---- test::test_cursor_move_peek stdout ----
@@ -233,20 +233,20 @@ thread 'test::test_cursor_move_peek' panicked at 'assertion failed: `(left == ri
  right: `None`', src\lib.rs:1078:9
 ```
 
-Wait now it's wrong *further back*. Ok I need to stop head-emptying peek because apparently it's a lot harder than I was willing to give it credit for. Just trying to blindly chain these cases is a disaster, let's have a proper if for the cases of ghost vs not:
+Погодите, теперь всё неправильно *еще раньше*. Окей, мне нужно перестать писать `peek` с пустой головой, потому что, очевидно, это намного сложнее, чем я готов был признать. Попытка вслепую связать эти случаи в цепочку — это катастрофа, давайте сделаем нормальный `if` для случаев с призраком и без:
 
 ```rust ,ignore
 pub fn peek_next(&mut self) -> Option<&mut T> {
     unsafe {
         let next = if let Some(cur) = self.cur {
-            // Normal case, try to follow the cur node's back pointer
+            // Обычный случай, пытаемся перейти по указателю back текущего узла
             (*cur.as_ptr()).back
         } else {
-            // Ghost case, try to use the list's front pointer
+            // Случай с призраком, пытаемся использовать указатель front списка
             self.list.front
         };
 
-        // Yield the element if the next node exists
+        // Выдаем элемент, если следующий узел существует
         next.map(|node| &mut (*node.as_ptr()).elem)
     }
 }
@@ -254,20 +254,20 @@ pub fn peek_next(&mut self) -> Option<&mut T> {
 pub fn peek_prev(&mut self) -> Option<&mut T> {
     unsafe {
         let prev = if let Some(cur) = self.cur {
-            // Normal case, try to follow the cur node's front pointer
+            // Обычный случай, пытаемся перейти по указателю front текущего узла
             (*cur.as_ptr()).front
         } else {
-            // Ghost case, try to use the list's back pointer
+            // Случай с призраком, пытаемся использовать указатель back списка
             self.list.back
         };
 
-        // Yield the element if the prev node exists
+        // Выдаем элемент, если предыдущий узел существует
         prev.map(|node| &mut (*node.as_ptr()).elem)
     }
 }
 ```
 
-Feelin' confident about this one!
+Чувствую уверенность в этом варианте!
 
 ```text
 failures:
@@ -285,9 +285,9 @@ failures:
 test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
 
-Yesss. Ok one more failure to go... oh.
+Даааа. Окей, осталась еще одна ошибка... ох.
 
-Did you notice the part where I commented out some code for testing remove_current? Yeah I wasn't paying attention to the fact that this test is stateful. Let's just create a new list with the state the remove_current part would have left us in:
+Вы заметили ту часть, где я закомментировал код для тестирования `remove_current`? Да, я не обратил внимания на то, что этот тест сохраняет состояние (stateful). Давайте просто создадим новый список с состоянием, в котором нас оставила бы часть с `remove_current`:
 
 ```rust ,ignore
 let mut m: LinkedList<u32> = LinkedList::new();
@@ -326,7 +326,7 @@ test src\lib.rs - assert_properties::iter_mut_invariant (line 803) - compile fai
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
 ```
 
-Heyyyy look at thaaat... ok now I'm getting paranoid. Let's properly fill in check_links and test it under miri:
+Хеееей, посмотрите на это... окей, теперь у меня паранойя. Давайте нормально заполним `check_links` и протестируем под Miri:
 
 ```rust ,ignore
 fn check_links<T: Eq + std::fmt::Debug>(list: &LinkedList<T>) {
@@ -338,7 +338,7 @@ fn check_links<T: Eq + std::fmt::Debug>(list: &LinkedList<T>) {
 }
 ```
 
-Is this the best way to do this? No. Is it fine? Yes.
+Является ли это лучшим способом сделать это? Нет. Всё ли нормально? Да.
 
 ```text
 $env:MIRIFLAGS="-Zmiri-tag-raw-pointers"
@@ -373,17 +373,17 @@ test src\lib.rs - assert_properties::iter_mut_invariant (line 803) - compile fai
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
 ```
 
-DONE.
+ГОТОВО.
 
-Done.
+Готово.
 
-We did it. We made a god damn production-quality LinkedList, with basically all the same functionality as the one in std. Are we missing little convenience methods here and there? Absolutely. Will I add them into the final published version of the crate? Probably!
+Мы сделали это. Мы создали чертовски качественный (production-quality) `LinkedList` практически со всей той же функциональностью, что и в `std`. Не хватает ли нам мелких удобных методов тут и там? Абсолютно. Добавлю ли я их в финальную опубликованную версию крейта? Возможно!
 
-But, I am, So Very Tired.
+Но я Так Сильно Устал.
 
-So. We win.
+Итак. Мы победили.
 
-Wait fuck. We're being production quality. Ok one last final boss: clippy.
+Погодите, черт. Мы же стремимся к промышленному качеству. Окей, последний финальный босс: `clippy`.
 
 ```text
 cargo clippy
@@ -440,26 +440,25 @@ warning: `linked-list` (lib) generated 4 warnings
     Finished dev [unoptimized + debuginfo] target(s) in 0.29s
 ```
 
-Alright clippy, let's do this.
+Ладно, `clippy`, давай сделаем это.
 
-Complaint 1 (and 3): we use `while let Some(_) = ` instead of `while .is_some()`. The loop is empty so this truly doesn't matter but ok fine, clippy, I'll do things your way.
+Претензия 1 (и 3): мы используем `while let Some(_) = ` вместо `while .is_some()`. Цикл пустой, так что это действительно не имеет значения, но ладно, `clippy`, я сделаю по-твоему.
 
-Complaint 2: We have an actual inherent into_iter method. Wait, what *checks std* ok, point to clippy. IntoIterator is in the prelude (and basically a lang item) so, we don't need an inherent version too.
+Претензия 2: У нас есть собственный метод `into_iter`. Погодите, что *проверяет std* окей, очко в пользу `clippy`. `IntoIterator` находится в прелюдии (и, по сути, является элементом языка), так что нам не нужна еще и собственная (inherent) версия.
 
-Complaint 4: we copied a weird cargocult from std. *shrug* fine I'll remove it.
+Претензия 4: мы скопировали странный карго-культ из `std`. *пожимает плечами* ладно, я его удалю.
 
 ```text
 cargo clippy
     Finished dev [unoptimized + debuginfo] target(s) in 0.00s
 ```
 
-Nice. Just one last thing to do before calling it production quality: fmt.
+Отлично. Осталось сделать только одну вещь перед тем, как назвать это промышленным качеством: `fmt`.
 
 ```text
 cargo fmt
 ```
 
-...yeah it added some newlines and removed some trailing whitespace. Nothing interesting.
+...да, он добавил несколько пустых строк и удалил несколько висячих пробелов. Ничего интересного.
 
-**WE ARE NOW TRULY FINALLY DONE!!!!!!!!!!!!!!!!!!!!!**
-
+**ТЕПЕРЬ МЫ ДЕЙСТВИТЕЛЬНО ОКОНЧАТЕЛЬНО ЗАКОНЧИЛИ!!!!!!!!!!!!!!!!!!!!!**

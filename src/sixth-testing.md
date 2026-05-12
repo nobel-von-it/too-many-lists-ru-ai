@@ -1,6 +1,6 @@
-# Testing
+# Тестирование (Testing)
 
-Alright I put off testing for a while because well, we both know that we're now masters of Rust and we don't make mistakes anymore! Also just, this is a rewrite of an old crate, so I just have all the tests already. They're tests, you've seen tests a lot already. Here they are:
+Ладно, я отложил тестирование на некоторое время, потому что, ну, мы оба знаем, что теперь мы мастера Rust и больше не совершаем ошибок! Кроме того, это просто переписывание старого крейта, так что у меня уже есть все тесты. Это тесты, вы уже много раз видели тесты. Вот они:
 
 ```rust ,ignore
 #[cfg(test)]
@@ -19,12 +19,12 @@ mod test {
     fn test_basic_front() {
         let mut list = LinkedList::new();
 
-        // Try to break an empty list
+        // Пробуем сломать пустой список
         assert_eq!(list.len(), 0);
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.len(), 0);
 
-        // Try to break a one item list
+        // Пробуем сломать список из одного элемента
         list.push_front(10);
         assert_eq!(list.len(), 1);
         assert_eq!(list.pop_front(), Some(10));
@@ -32,7 +32,7 @@ mod test {
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.len(), 0);
 
-        // Mess around
+        // Дурачимся
         list.push_front(10);
         assert_eq!(list.len(), 1);
         list.push_front(20);
@@ -254,7 +254,7 @@ mod test {
 
     #[test]
     fn test_hashmap() {
-        // Check that HashMap works with this as a key
+        // Проверяем, что HashMap работает с этим типом в качестве ключа
 
         let list1: LinkedList<i32> = (0..10).collect();
         let list2: LinkedList<i32> = (1..11).collect();
@@ -276,7 +276,7 @@ mod test {
 }
 ```
 
-And now for the moments of truth:
+А теперь момент истины:
 
 ```text
 cargo test
@@ -326,6 +326,6 @@ test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 😭
 
-We did it, we actually didn't screw up. This isn't a trick! All of our practice and training was finally worth it, we've finally written *good code*!!!
+Мы сделали это, мы действительно не облажались. Это не трюк! Вся наша практика и тренировки наконец-то окупились, мы наконец-то написали *хороший код*!!!
 
-Now with all that gunk out of the way, we can get back to the Interesting Stuff!
+Теперь, когда всё это барахло позади, мы можем вернуться к Интересным Вещам!

@@ -1,23 +1,23 @@
-# Boring Combinatorics
+# Скучная комбинаторика (Boring Combinatorics)
 
-Ok, back to our regularly scheduled linked lists!
+Итак, возвращаемся к нашим регулярным связанным спискам!
 
-First let's knock out `Drop` which is trivial with pop:
+Сначала давайте разберемся с `Drop`, что тривиально сделать с помощью `pop`:
 
 ```rust ,ignore
 impl<T> Drop for LinkedList<T> {
     fn drop(&mut self) {
-        // Pop until we have to stop
+        // Извлекаем, пока не придется остановиться
         while let Some(_) = self.pop_front() { }
     }
 }
 ```
 
-We've got to fill in a bunch of really boring combinatoric implementations like front, front_mut, back, back_mut, iter, iter_mut, into_iter, ...
+Нам нужно заполнить кучу действительно скучных комбинаторных реализаций, таких как `front`, `front_mut`, `back`, `back_mut`, `iter`, `iter_mut`, `into_iter` ...
 
-You could do them with macros or whatever but honestly, that's a worse fate than copy-pasting. We're just going to do a lot of copy-pasting. I have *very carefully* crafted the previous push/pop implementations so that we should be able to *literally* just swap front and back and the code does/says the right thing! Hooray for painful experience! (It's so tempting to talk about "prev and next" for nodes, but I find it's really worth it to just consistently talk about "front" and "back" as much as possible to avoid mistakes.)
+Вы могли бы сделать их с помощью макросов или чего-то подобного, но, честно говоря, это худшая участь, чем копипаст. Мы просто собираемся сделать много копипаста. Я *очень тщательно* проработал предыдущие реализации `push`/`pop` так, чтобы мы могли *буквально* просто поменять местами `front` и `back`, и код делал бы/говорил то, что нужно! Ура болезненному опыту! (Так велик соблазн говорить о «prev и next» для узлов, но я считаю, что действительно стоит последовательно говорить о «front» и «back» как можно чаще, чтобы избежать ошибок.)
 
-Alright, first up, `front`:
+Итак, первый пошел, `front`:
 
 ```rust ,ignore
 pub fn front(&self) -> Option<&T> {
@@ -27,7 +27,7 @@ pub fn front(&self) -> Option<&T> {
 }
 ```
 
-Hey actually, this book is really old and some nice new things have been added like the `?` operator which does an early return on Option::None, does that make our code nicer?
+Эй, вообще-то эта книга довольно старая, и с тех пор были добавлены некоторые приятные новые вещи, такие как оператор `?`, который делает ранний возврат при `Option::None`. Делает ли это наш код красивее?
 
 
 ```rust ,ignore
@@ -38,7 +38,7 @@ pub fn front(&self) -> Option<&T> {
 }
 ```
 
-Maybe? It's kind of a wash for something this simple, and the previous section was all about how early returns are kinda spooky for us, so maybe we should prefer being a bit more explicit here (I'm sticking to the `map` implementation).  On to front_mut:
+Может быть? Для чего-то столь простого это примерно то же самое, а предыдущий раздел был посвящен тому, как ранние возвраты немного пугают нас, так что, возможно, нам стоит предпочесть быть чуть более явными здесь (я придерживаюсь реализации с `map`). Перейдем к `front_mut`:
 
 ```rust ,ignore
 pub fn front_mut(&mut self) -> Option<&mut T> {
@@ -48,15 +48,15 @@ pub fn front_mut(&mut self) -> Option<&mut T> {
 }
 ```
 
-I'll just dump all the `back` versions at the end. 
+Я просто вывалю все версии для `back` в конце.
 
-Next up, iterators. Unlike all of our previous lists we've *finally* unlocked the ability to do [DoubleEndedIterator](https://doc.rust-lang.org/std/iter/trait.DoubleEndedIterator.html), and if we're going for production quality we're gonna do [ExactSizeIterator](https://doc.rust-lang.org/std/iter/trait.ExactSizeIterator.html) too.
+Далее — итераторы. В отличие от всех наших предыдущих списков, мы *наконец-то* разблокировали возможность сделать [DoubleEndedIterator](https://doc.rust-lang.org/std/iter/trait.DoubleEndedIterator.html), и если мы стремимся к промышленному качеству, мы сделаем также и [ExactSizeIterator](https://doc.rust-lang.org/std/iter/trait.ExactSizeIterator.html).
 
-So in addition to `next` and `size_hint`, we're going to support `next_back` and `len`.
+Поэтому в дополнение к `next` и `size_hint` мы собираемся поддерживать `next_back` и `len`.
 
-The vigilant among you might notice that IterMut seems a lot more sketchy with double-ended iteration, but it's actually still sound!
+Самые бдительные из вас могут заметить, что `IterMut` выглядит гораздо более подозрительно (sketchy) с двунаправленной итерацией, но на самом деле это всё еще корректно (sound)!
 
-... god this is gonna be a lot of boilerplate. Maybe I should really write a macro... no, no, that's still a worse fate.
+... боже, это будет куча шаблонного кода (boilerplate). Может, мне действительно стоит написать макрос... нет, нет, это всё же худшая участь.
 
 ```rust ,ignore
 pub struct Iter<'a, T> {
@@ -91,11 +91,11 @@ impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
     
     fn next(&mut self) -> Option<Self::Item> {
-        // While self.front == self.back is a tempting condition to check here,
-        // it won't do the right for yielding the last element! That sort of
-        // thing only works for arrays because of "one-past-the-end" pointers.
+        // Хотя проверка условия `self.front == self.back` здесь заманчива,
+        // она не сработает правильно для выдачи последнего элемента! Такого
+        // рода вещи работают только для массивов из-за указателей «за конец».
         if self.len > 0 {
-            // We could unwrap front, but this is safer and easier
+            // Мы могли бы вызвать unwrap для front, но это безопаснее и проще
             self.front.map(|node| unsafe {
                 self.len -= 1;
                 self.front = (*node.as_ptr()).back;
@@ -132,9 +132,9 @@ impl<'a, T> ExactSizeIterator for Iter<'a, T> {
 }
 ```
 
-...that's just `.iter()`...
+...это всего лишь `.iter()`...
 
-we'll paste IterMut at the end, it's literally the exact same code with `mut` in a lot of places, let's just knock out `into_iter` first. We can mercifully still lean on our tried-and-true solution of just making it wrap our collection and using pop for next:
+мы вставим `IterMut` в конце, это буквально тот же самый код с `mut` во многих местах, давайте сначала разберемся с `into_iter`. К счастью, мы всё еще можем опереться на наше проверенное решение: просто обернуть нашу коллекцию и использовать `pop` для `next`:
 
 ```rust ,ignore
 pub struct IntoIter<T> {
@@ -184,9 +184,9 @@ impl<T> ExactSizeIterator for IntoIter<T> {
 }
 ```
 
-Still a crapload of boiler plate, but at least it's *satisfying* boilerplate.
+Всё еще куча шаблонного кода, но по крайней мере это *удовлетворяющий* шаблонный код.
 
-Alright, here's all of our code with all the combinatorics filled in:
+Итак, вот весь наш код со всеми заполненными комбинаторными реализациями:
 
 ```rust
 use std::ptr::NonNull;
@@ -236,7 +236,7 @@ impl<T> LinkedList<T> {
     }
 
     pub fn push_front(&mut self, elem: T) {
-        // SAFETY: it's a linked-list, what do you want?
+        // SAFETY: это связанный список, чего вы хотите?
         unsafe {
             let new = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
                 front: None,
@@ -244,22 +244,22 @@ impl<T> LinkedList<T> {
                 elem,
             })));
             if let Some(old) = self.front {
-                // Put the new front before the old one
+                // Помещаем новый передний узел перед старым
                 (*old.as_ptr()).front = Some(new);
                 (*new.as_ptr()).back = Some(old);
             } else {
-                // If there's no front, then we're the empty list and need 
-                // to set the back too.
+                // Если переднего узла нет, значит, список пуст, и нам нужно
+                // установить также и задний узел.
                 self.back = Some(new);
             }
-            // These things always happen!
+            // Эти вещи происходят всегда!
             self.front = Some(new);
             self.len += 1;
         }
     }
 
     pub fn push_back(&mut self, elem: T) {
-        // SAFETY: it's a linked-list, what do you want?
+        // SAFETY: это связанный список, чего вы хотите?
         unsafe {
             let new = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
                 back: None,
@@ -267,15 +267,15 @@ impl<T> LinkedList<T> {
                 elem,
             })));
             if let Some(old) = self.back {
-                // Put the new back before the old one
+                // Помещаем новый задний узел перед старым
                 (*old.as_ptr()).back = Some(new);
                 (*new.as_ptr()).front = Some(old);
             } else {
-                // If there's no back, then we're the empty list and need 
-                // to set the front too.
+                // Если заднего узла нет, значит, список пуст, и нам нужно
+                // установить также и передний узел.
                 self.front = Some(new);
             }
-            // These things always happen!
+            // Эти вещи происходят всегда!
             self.back = Some(new);
             self.len += 1;
         }
@@ -283,52 +283,52 @@ impl<T> LinkedList<T> {
 
     pub fn pop_front(&mut self) -> Option<T> {
         unsafe {
-            // Only have to do stuff if there is a front node to pop.
+            // Нам нужно что-то делать только если есть передний узел для извлечения.
             self.front.map(|node| {
-                // Bring the Box back to life so we can move out its value and
-                // Drop it (Box continues to magically understand this for us).
+                // Возвращаем Box к жизни, чтобы мы могли забрать его значение и
+                // дропнуть его (Box продолжает магическим образом понимать это за нас).
                 let boxed_node = Box::from_raw(node.as_ptr());
                 let result = boxed_node.elem;
 
-                // Make the next node into the new front.
+                // Делаем следующий узел новым передним узлом.
                 self.front = boxed_node.back;
                 if let Some(new) = self.front {
-                    // Cleanup its reference to the removed node
+                    // Очищаем его ссылку на удаленный узел
                     (*new.as_ptr()).front = None;
                 } else {
-                    // If the front is now null, then this list is now empty!
+                    // Если передний узел теперь null, то этот список теперь пуст!
                     self.back = None;
                 }
 
                 self.len -= 1;
                 result
-                // Box gets implicitly freed here, knows there is no T.
+                // Box неявно освобождается здесь и знает, что там нет T.
             })
         }
     }
 
     pub fn pop_back(&mut self) -> Option<T> {
         unsafe {
-            // Only have to do stuff if there is a back node to pop.
+            // Нам нужно что-то делать только если есть задний узел для извлечения.
             self.back.map(|node| {
-                // Bring the Box front to life so we can move out its value and
-                // Drop it (Box continues to magically understand this for us).
+                // Возвращаем Box к жизни, чтобы мы могли забрать его значение и
+                // дропнуть его (Box продолжает магическим образом понимать это за нас).
                 let boxed_node = Box::from_raw(node.as_ptr());
                 let result = boxed_node.elem;
 
-                // Make the next node into the new back.
+                // Делаем следующий узел новым задним узлом.
                 self.back = boxed_node.front;
                 if let Some(new) = self.back {
-                    // Cleanup its reference to the removed node
+                    // Очищаем его ссылку на удаленный узел
                     (*new.as_ptr()).back = None;
                 } else {
-                    // If the back is now null, then this list is now empty!
+                    // Если задний узел теперь null, то этот список теперь пуст!
                     self.front = None;
                 }
 
                 self.len -= 1;
                 result
-                // Box gets implicitly freed here, knows there is no T.
+                // Box неявно освобождается здесь и знает, что там нет T.
             })
         }
     }
@@ -388,7 +388,7 @@ impl<T> LinkedList<T> {
 
 impl<T> Drop for LinkedList<T> {
     fn drop(&mut self) {
-        // Pop until we have to stop
+        // Извлекаем, пока не придется остановиться
         while let Some(_) = self.pop_front() { }
     }
 }
@@ -406,11 +406,11 @@ impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // While self.front == self.back is a tempting condition to check here,
-        // it won't do the right for yielding the last element! That sort of
-        // thing only works for arrays because of "one-past-the-end" pointers.
+        // Хотя проверка условия `self.front == self.back` здесь заманчива,
+        // она не сработает правильно для выдачи последнего элемента! Такого
+        // рода вещи работают только для массивов из-за указателей «за конец».
         if self.len > 0 {
-            // We could unwrap front, but this is safer and easier
+            // Мы могли бы вызвать unwrap для front, но это безопаснее и проще
             self.front.map(|node| unsafe {
                 self.len -= 1;
                 self.front = (*node.as_ptr()).back;
@@ -459,11 +459,11 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // While self.front == self.back is a tempting condition to check here,
-        // it won't do the right for yielding the last element! That sort of
-        // thing only works for arrays because of "one-past-the-end" pointers.
+        // Хотя проверка условия `self.front == self.back` здесь заманчива,
+        // она не сработает правильно для выдачи последнего элемента! Такого
+        // рода вещи работают только для массивов из-за указателей «за конец».
         if self.len > 0 {
-            // We could unwrap front, but this is safer and easier
+            // Мы могли бы вызвать unwrap для front, но это безопаснее и проще
             self.front.map(|node| unsafe {
                 self.len -= 1;
                 self.front = (*node.as_ptr()).back;
@@ -541,12 +541,12 @@ mod test {
     fn test_basic_front() {
         let mut list = LinkedList::new();
 
-        // Try to break an empty list
+        // Пробуем сломать пустой список
         assert_eq!(list.len(), 0);
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.len(), 0);
 
-        // Try to break a one item list
+        // Пробуем сломать список из одного элемента
         list.push_front(10);
         assert_eq!(list.len(), 1);
         assert_eq!(list.pop_front(), Some(10));
@@ -554,7 +554,7 @@ mod test {
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.len(), 0);
 
-        // Mess around
+        // Дурачимся
         list.push_front(10);
         assert_eq!(list.len(), 1);
         list.push_front(20);
@@ -577,4 +577,3 @@ mod test {
         assert_eq!(list.len(), 0);
     }
 }
-```

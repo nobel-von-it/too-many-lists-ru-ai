@@ -1,14 +1,14 @@
-# Send, Sync, and Compile Tests
+# Тесты Send, Sync и компиляции (Send, Sync, and Compile Tests)
 
-Ok actually we do have one more pair of traits to think about, but they're special. We have to deal with Rust's Holy Roman Empire: The Unsafe Opt-In Built-In Traits (OIBITs): [Send and Sync](https://doc.rust-lang.org/nomicon/send-and-sync.html), which are in fact opt-out and built-out (1 out of 3 is pretty good!).
+Окей, на самом деле у нас есть еще одна пара трейтов, о которой стоит подумать, но они особенные. Нам предстоит иметь дело со Священной Римской Империей Rust: Небезопасными Встраиваемыми Трейтами, Требующими Явного Включения (Unsafe Opt-In Built-In Traits — OIBIT): [Send и Sync](https://doc.rust-lang.org/nomicon/send-and-sync.html), которые на самом деле требуют явного отключения (opt-out) и встраиваются автоматически (1 из 3 — это довольно неплохо!).
 
-Like Copy, these traits have absolutely no code associated with them, and are just markers that your type has a particular property. Send says that your type is safe to send to another thread. Sync says your type is safe to share between threads (&Self: Send).
+Как и `Copy`, эти трейты не имеют абсолютно никакого связанного с ними кода и являются просто маркерами того, что ваш тип обладает определенным свойством. `Send` говорит о том, что ваш тип безопасно отправлять в другой поток. `Sync` говорит о том, что вашим типом безопасно делиться между потоками (`&Self: Send`).
 
-The same argument for LinkedList being covariant applies here: generally normal collections which don't use fancy interior mutability tricks are safe to make Send and Sync.
+Тот же аргумент в пользу ковариантности `LinkedList` применим и здесь: обычно нормальные коллекции, которые не используют хитрых трюков с внутренней изменяемостью (interior mutability), безопасно делать `Send` и `Sync`.
 
-But I said they're *opt out*. So actually, are we already? How would we know?
+Но я сказал, что они требуют *явного отключения* (opt out). Так что, на самом деле, являемся ли мы ими уже сейчас? Как нам это узнать?
 
-Let's add some new magic to our code: random private garbage that won't compile unless our types have the properties we expect:  
+Давайте добавим немного новой магии в наш код: случайный приватный мусор, который не скомпилируется, если наши типы не обладают ожидаемыми свойствами:
 
 ```rust ,ignore
 #[allow(dead_code)]
@@ -59,12 +59,12 @@ note: required by a bound in `is_send`
 430 |     fn is_send<T: Send>() {}
     |                   ^^^^ required by this bound in `is_send`
 
-<a million more errors>
+<еще миллион ошибок>
 ```
 
-Oh geez, what gives! I had that great Holy Roman Empire joke!
+О боже, в чем дело! У меня ведь была такая отличная шутка про Священную Римскую Империю!
 
-Well, I lied to you when I said raw pointers have only one safety guard: this is the other. `*const` AND `*mut` explicitly opt out of Send and Sync to be safe, so we do *actually* have to opt back in:
+Что ж, я солгал вам, когда сказал, что у сырых указателей есть только одна защитная функция: вот и вторая. `*const` И `*mut` явно отказываются от `Send` и `Sync` ради безопасности, поэтому нам *действительно* нужно включить их обратно вручную:
 
 ```rust ,ignore
 unsafe impl<T: Send> Send for LinkedList<T> {}
@@ -77,9 +77,9 @@ unsafe impl<'a, T: Send> Send for IterMut<'a, T> {}
 unsafe impl<'a, T: Sync> Sync for IterMut<'a, T> {}
 ```
 
-Note that we have to write *unsafe impl* here: these are *unsafe traits*! Unsafe code (like concurrency libraries) gets to rely on us only implementing these traits correctly! Since there's no actual code, the guarantee we're making is just that, yes, we are indeed safe to Send or Share between threads!
+Обратите внимание, что мы должны писать здесь `unsafe impl`: это *небезопасные трейты*! Небезопасный код (например, библиотеки конкурентности) полагается на то, что мы реализуем эти трейты правильно! Поскольку здесь нет фактического кода, гарантия, которую мы даем, заключается лишь в том, что да, нас действительно безопасно отправлять (`Send`) или делиться (`Sync`) между потоками!
 
-Don't just slap these on lightly, but I am a Certified Professional here to say: yep there's are totally fine. Note how we don't need to implement Send and Sync for IntoIter: it just contains LinkedList, so it auto-derives Send and Sync &mdash; I told you they were actually opt out! (You opt out with the hillarious syntax of `impl !Send for MyType {}`.)
+Не навешивайте их легкомысленно, но я, как Сертифицированный Профессионал, готов сказать: да, здесь всё совершенно нормально. Обратите внимание, что нам не нужно реализовывать `Send` и `Sync` для `IntoIter`: он просто содержит `LinkedList`, поэтому он автоматически выводит (auto-derives) `Send` и `Sync` — я же говорил вам, что они на самом деле отключаемые (opt out)! (Вы отключаетесь с помощью забавного синтаксиса `impl !Send for MyType {}`.)
 
 ```text
 cargo build
@@ -87,11 +87,11 @@ cargo build
     Finished dev [unoptimized + debuginfo] target(s) in 0.18s
 ```
 
-Ok nice!
+Окей, отлично!
 
-...Wait, actually it would be really dangerous if stuff that *shouldn't* be these things wasn't. In particular, IterMut *definitely* shouldn't be covariant, because it's "like" `&mut T`. But how can we check that?
+...Погодите, на самом деле было бы очень опасно, если бы вещи, которые *не должны* быть таковыми, ими оказывались. В частности, `IterMut` *определенно* не должен быть ковариантным, потому что он «подобен» `&mut T`. Но как мы можем это проверить?
 
-With Magic! Well, actually, with rustdoc! Ok well we don't have to use rustdoc for this, but it's the funniest way to do it. See, if you write a doccomment and include a code block, then rustdoc will try to compile and run it, so we can use that to make fresh anonymous "programs" that don't affect the main one:
+С помощью Магии! Ну, на самом деле, с помощью `rustdoc`! Окей, нам не обязательно использовать `rustdoc` для этого, но это самый забавный способ. Видите ли, если вы пишете документационный комментарий и включаете в него блок кода, то `rustdoc` попытается скомпилировать и запустить его. Таким образом, мы можем использовать это для создания свежих анонимных «программ», которые не влияют на основную:
 
 
 ```rust ,ignore
@@ -126,9 +126,9 @@ error[E0308]: mismatched types
              found struct `linked_list::IterMut<'_, &'static T>`
 ```
 
-Ok cool, we've proved it's invariant, but uh, now our tests fail. No worries, rustdoc lets you say that's expected by annotating the fence with compile_fail!
+Отлично, мы доказали, что он инвариантен, но эээ, теперь наши тесты фейлятся. Без паники, `rustdoc` позволяет сказать, что это ожидаемо, если аннотировать блок кодом `compile_fail`!
 
-(Actually we only proved it's "not covariant" but honestly if you manage to make a type "accidentaly and incorrectly contravariant" then, congrats?)
+(На самом деле мы доказали только то, что он «не ковариантен», но, честно говоря, если вам удастся сделать тип «случайно и ошибочно контрвариантным», то... поздравляю?)
 
 ```rust ,ignore
     /// ```compile_fail
@@ -155,9 +155,9 @@ test src\lib.rs - assert_properties::iter_mut_invariant (line 458) - compile fai
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
 ```
 
-Yay! I recommend always making the test without compile_fail so that you can confirm that it fails to compile *for the right reason*. For instance, that test will also fail (and therefore pass) if you forget the `use`, which, is not what we want! While it's conceptually appealing to be able to "require" a specific error from the compiler, this would be an absolute nightmare that would effectively make it a breaking change *for the compiler to produce better errors*. We want the compiler to get better, so, no you don't get to have that.
+Ура! Я рекомендую всегда сначала делать тест без `compile_fail`, чтобы вы могли убедиться, что он не компилируется *по правильной причине*. Например, этот тест также зафейлится (и, следовательно, пройдет проверку), если вы забудете написать `use`, а это не то, чего мы хотим! Хотя концептуально привлекательно иметь возможность «требовать» определенную ошибку от компилятора, это было бы абсолютным кошмаром, который фактически сделал бы любое улучшение сообщений об ошибках компилятора ломающим изменением. Мы хотим, чтобы компилятор становился лучше, так что нет, вы этого не получите.
 
-(Oh wait, we can actually just specify the error code we want next to the compile_fail **but this only works on nightly and is a bad idea to rely on for the reasons state above. It will be silently ignored on not-nightly.**)
+(Ой, подождите, мы на самом деле можем указать код ошибки, который мы ожидаем, рядом с `compile_fail`, **но это работает только на nightly-версии и на это плохая идея полагаться по причинам, указанным выше. На стабильной версии это будет молча проигнорировано.**)
 
 ```rust ,ignore
     /// ```compile_fail,E0308
@@ -168,7 +168,7 @@ Yay! I recommend always making the test without compile_fail so that you can con
     fn iter_mut_invariant() {}
 ```
 
-...also, did you notice the part where we actually made IterMut invariant? It was easy to miss, since I "just" copy-pasted Iter and dumped it at the end. It's the last line here:
+...кстати, вы заметили ту часть, где мы действительно сделали `IterMut` инвариантным? Ее было легко пропустить, так как я «просто» скопировал `Iter` и вставил его в конец. Это последняя строка здесь:
 
 ```rust ,ignore
 pub struct IterMut<'a, T> {
@@ -179,7 +179,7 @@ pub struct IterMut<'a, T> {
 }
 ```
 
-Let's try removing that PhantomData:
+Давайте попробуем удалить этот `PhantomData`:
 
 ```text
  cargo build
@@ -193,7 +193,7 @@ error[E0392]: parameter `'a` is never used
    = help: consider removing `'a`, referring to it in a field, or using a marker such as `PhantomData`
 ```
 
-Ha! The compiler has our back and won't just let us *not* use the lifetime. Let's try using the *wrong* example instead:
+Ха! Компилятор прикрывает нашу спину и просто не позволит нам *не* использовать время жизни. Давайте попробуем вместо этого использовать *неправильный* пример:
 
 ```rust ,ignore
     _boo: PhantomData<&'a T>,
@@ -205,7 +205,7 @@ cargo build
     Finished dev [unoptimized + debuginfo] target(s) in 0.17s
 ```
 
-It builds! Do our tests catch a problem now?
+Он собирается! Поймают ли наши тесты проблему теперь?
 
 ```text
 cargo test
@@ -228,5 +228,4 @@ failures:
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
 ```
 
-Eyyy!!! The system works! I love having tests that actually do their job, so that I don't have to be quite so horrified of looming mistakes!
-
+Эээй!!! Система работает! Мне нравится иметь тесты, которые действительно делают свою работу, чтобы мне не приходилось так сильно ужасаться грядущих ошибок!

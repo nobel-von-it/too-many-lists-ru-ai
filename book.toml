@@ -1,7 +1,7 @@
 [book]
-title = "Learning Rust With Entirely Too Many Linked Lists"
+title = "Изучение Rust с помощью слишком большого количества списков"
 author = "Aria Desires"
-description = "Learning Rust With Entirely Too Many Linked Lists"
+description = "Изучение Rust с помощью слишком большого количества списков"
 
 [build]
 build-dir = "book"
