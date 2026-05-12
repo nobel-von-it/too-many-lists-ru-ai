@@ -1,9 +1,9 @@
-# Pop
+# Извлечение (Pop)
 
-Like `push`, `pop` wants to mutate the list. Unlike `push`, we actually
-want to return something. But `pop` also has to deal with a tricky corner
-case: what if the list is empty? To represent this case, we use the trusty
-`Option` type:
+Как и `push`, `pop` хочет изменять список. В отличие от `push`, мы на самом деле
+хотим что-то вернуть. Но `pop` также должен иметь дело со сложным крайним
+случаем: что если список пуст? Для представления этого случая мы используем надежный
+тип `Option`:
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -11,18 +11,18 @@ pub fn pop(&mut self) -> Option<i32> {
 }
 ```
 
-`Option<T>` is an enum that represents a value that may exist. It can either be
-`Some(T)` or `None`. We could make our own enum for this like we did for
-Link, but we want our users to be able to understand what the heck our return
-type is, and Option is so ubiquitous that *everyone* knows it. In fact, it's so
-fundamental that it's implicitly imported into scope in every file, as well
-as its variants `Some` and `None` (so we don't have to say `Option::None`).
+`Option<T>` — это перечисление (`enum`), которое представляет значение, которое может существовать. Оно может быть либо
+`Some(T)`, либо `None`. Мы могли бы создать собственное перечисление для этого, как мы сделали для
+`Link`, но мы хотим, чтобы наши пользователи могли понимать, что за чертовщину возвращает наш
+тип, а `Option` настолько вездесущ, что его знают *все*. На самом деле, он настолько
+фундаментален, что неявно импортируется в область видимости в каждом файле, так же
+как и его варианты `Some` и `None` (так что нам не нужно писать `Option::None`).
 
-The pointy bits on `Option<T>` indicate that Option is actually *generic* over
-T. That means that you can make an Option for *any* type!
+Угловые скобки в `Option<T>` указывают на то, что `Option` на самом деле является *обобщенным (generic)* по
+`T`. Это означает, что вы можете создать `Option` для *любого* типа!
 
-So uh, we have this `Link` thing, how do we figure out if it's Empty or has
-More? Pattern matching with `match`!
+Итак, у нас есть эта штука `Link`, как нам узнать, пуста ли она (`Empty`) или в ней есть
+что-то еще (`More`)? Сопоставление с образцом (Pattern matching) с помощью `match`!
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -52,11 +52,11 @@ error[E0308]: mismatched types
               found type `()`
 ```
 
-Whoops, `pop` has to return a value, and we're not doing that yet. We *could*
-return `None`, but in this case it's probably a better idea to return
-`unimplemented!()`, to indicate that we aren't done implementing the function.
-`unimplemented!()` is a macro (`!` indicates a macro) that panics the program
-when we get to it (\~crashes it in a controlled manner).
+Упс, `pop` должен возвращать значение, а мы этого еще не делаем. Мы *могли бы*
+вернуть `None`, но в данном случае, вероятно, лучше вернуть
+`unimplemented!()`, чтобы указать, что мы еще не закончили реализацию функции.
+`unimplemented!()` — это макрос (`!` указывает на макрос), который вызывает панику (panic) программы,
+когда мы до него доходим (~аварийно завершает ее контролируемым образом).
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -72,15 +72,15 @@ pub fn pop(&mut self) -> Option<i32> {
 }
 ```
 
-Unconditional panics are an example of a [diverging function][diverging].
-Diverging functions never return to the caller, so they may be used in places
-where a value of any type is expected. Here, `unimplemented!()` is being
-used in place of a value of type `Option<T>`.
+Безусловные паники — это пример [расходящейся функции (diverging function)][diverging].
+Расходящиеся функции никогда не возвращают управление вызывающей стороне, поэтому их можно использовать в местах,
+где ожидается значение любого типа. Здесь `unimplemented!()` используется
+вместо значения типа `Option<T>`.
 
-Note also that we don't need to write `return` in our program. The last
-expression (basically line) in a function is implicitly its return value. This
-lets us express really simple things a bit more concisely. You can always
-explicitly return early with `return` like any other C-like language.
+Обратите внимание также, что нам не нужно писать `return` в нашей программе. Последнее
+выражение (по сути, строка) в функции неявно является ее возвращаемым значением. Это
+позволяет нам выражать очень простые вещи немного более кратко. Вы всегда можете
+явно выполнить возврат досрочно с помощью `return`, как в любом другом Си-подобном языке.
 
 ```text
 > cargo build
@@ -104,16 +104,16 @@ note: move occurs because `node` has type `std::boxed::Box<first::Node>`, which 
    |                        ^^^^
 ```
 
-Come on Rust, get off our back! As always, Rust is hella mad at us. Thankfully,
-this time it's also giving us the full scoop! By default, a pattern match will
-try to move its contents into the new branch, but we can't do this because we
-don't own self by-value here.
+Да ладно тебе, Rust, отвяжись от нас! Как всегда, Rust чертовски зол на нас. К счастью,
+на этот раз он также дает нам полную информацию! По умолчанию сопоставление с образцом пытается
+переместить свое содержимое в новую ветку, но мы не можем этого сделать, потому что здесь мы
+не владеем `self` по значению.
 
 ```text
 help: consider borrowing here: `&self.head`
 ```
 
-Rust says we should add a reference to our `match` to fix that. 🤷‍♀️ Let's try it:
+Rust говорит, что нам следует добавить ссылку в наш `match`, чтобы исправить это. 🤷‍♀️ Давайте попробуем:
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -155,10 +155,10 @@ warning: field is never used: `next`
    |     ^^^^^^^^^^
 ```
 
-Hooray, compiling again! Now let's figure out that logic. We want to make an
-Option, so let's make a variable for that. In the Empty case we need to return
-None. In the More case we need to return `Some(i32)`, and change the head of
-the list. So, let's try to do basically that?
+Ура, снова компилируется! Теперь давайте разберемся с этой логикой. Мы хотим создать
+`Option`, так что давайте создадим для этого переменную. В случае `Empty` нам нужно вернуть
+`None`. В случае `More` нам нужно вернуть `Some(i32)` и изменить заголовок (head)
+списка. Итак, давайте попробуем сделать именно это?
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -187,30 +187,29 @@ error[E0507]: cannot move out of borrowed content
 
 ```
 
-*head*
+*головой*
 
-*desk*
+*об стол*
 
-We're trying to move out of `node` when all we have is a shared reference to it.
+Мы пытаемся переместить данные из `node`, когда все, что у нас есть, — это разделяемая ссылка на него.
 
-We should probably step back and think about what we're trying to do. We want
-to:
+Нам, вероятно, следует отступить и подумать о том, что мы пытаемся сделать. Мы хотим:
 
-* Check if the list is empty.
-* If it's empty, just return None
-* If it's *not* empty
-    * remove the head of the list
-    * remove its `elem`
-    * replace the list's head with its `next`
-    * return `Some(elem)`
+* Проверить, пуст ли список.
+* Если он пуст, просто вернуть `None`
+* Если он *не* пуст:
+    * удалить заголовок (head) списка
+    * забрать его `elem`
+    * заменить заголовок списка на его `next`
+    * вернуть `Some(elem)`
 
-The key insight is we want to *remove* things, which means we want to get the
-head of the list *by value*. We certainly can't do that through the shared
-reference we get through `&self.head`. We also "only" have a mutable reference
-to `self`, so the only way we can move stuff is to *replace it*. Looks like we're doing
-the Empty dance again!
+Ключевое понимание заключается в том, что мы хотим *удалить* вещи, а это значит, что мы хотим получить
+заголовок списка *по значению*. Мы определенно не можем сделать это через разделяемую
+ссылку, которую мы получаем через `&self.head`. У нас также есть «только» изменяемая ссылка
+на `self`, поэтому единственный способ переместить вещи — это *заменить их*. Похоже, мы снова танцуем
+танец `Empty`!
 
-Let's try that:
+Давайте попробуем:
 
 
 ```rust ,ignore
@@ -235,19 +234,18 @@ cargo build
    Finished dev [unoptimized + debuginfo] target(s) in 0.22s
 ```
 
-O M G
+О Б О Ж Е М О Й
 
-It compiled without *any* warnings!!!!!
+Оно скомпилировалось без *единого* предупреждения!!!!!
 
-Actually I'm going to apply my own personal lint here: we made this `result`
-value to return, but actually we didn't need to do that at all! Just as a
-function evaluates to its last expression, every block also evaluates to
-its last expression. Normally we supress this behaviour with semi-colons,
-which instead makes the block evaluate to the empty tuple, `()`. This is
-actually the value that functions which don't declare a return value -- like
-`push` -- return.
+На самом деле я собираюсь применить здесь свой личный линт (проверку): мы создали это значение `result`
+для возврата, но на самом деле нам вообще не нужно было этого делать! Точно так же, как
+функция вычисляется до своего последнего выражения, каждый блок также вычисляется до
+своего последнего выражения. Обычно мы подавляем это поведение точкой с запятой,
+что вместо этого заставляет блок вычисляться в пустой кортеж `()`. Это
+фактически то значение, которое возвращают функции, не объявляющие возвращаемое значение (например, `push`).
 
-So instead, we can write `pop` as:
+Поэтому вместо этого мы можем написать `pop` следующим образом:
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<i32> {
@@ -261,9 +259,9 @@ pub fn pop(&mut self) -> Option<i32> {
 }
 ```
 
-Which is a bit more concise and idiomatic. Note that the Link::Empty branch
-completely lost its braces, because we only have one expression to
-evaluate. Just a nice shorthand for simple cases.
+Что является немного более кратким и идиоматичным. Обратите внимание, что ветка `Link::Empty`
+полностью потеряла свои фигурные скобки, потому что нам нужно вычислить только одно
+выражение. Просто приятное сокращение для простых случаев.
 
 ```text
 cargo build
@@ -271,7 +269,7 @@ cargo build
    Finished dev [unoptimized + debuginfo] target(s) in 0.22s
 ```
 
-Nice, still works!
+Отлично, все еще работает!
 
 
 

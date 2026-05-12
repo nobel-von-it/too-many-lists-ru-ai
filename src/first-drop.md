@@ -1,13 +1,13 @@
-# Drop
+# Удаление (Drop)
 
-We can make a stack, push on to, pop off it, and we've even tested that it all
-works right!
+Мы можем создавать стек, добавлять в него элементы, извлекать их и даже протестировали, что все
+это работает правильно!
 
-Do we need to worry about cleaning up our list? Technically, no, not at all!
-Like C++, Rust uses destructors to automatically clean up resources when they're
-done with. A type has a destructor if it implements a *trait* called Drop.
-Traits are Rust's fancy term for interfaces. The Drop trait has the following
-interface:
+Нужно ли нам беспокоиться об очистке нашего списка? Технически — нет, совсем нет!
+Как и C++, Rust использует деструкторы для автоматической очистки ресурсов, когда они
+больше не нужны. Тип имеет деструктор, если он реализует *типаж (trait)* под названием `Drop`.
+Типажи — это причудливый термин в Rust для интерфейсов. Типаж `Drop` имеет следующий
+интерфейс:
 
 ```rust ,ignore
 pub trait Drop {
@@ -15,49 +15,49 @@ pub trait Drop {
 }
 ```
 
-Basically, "when you go out of scope, I'll give you a second to clean up your
-affairs".
+В сущности: «когда вы выходите из области видимости, я дам вам секунду, чтобы привести свои
+дела в порядок».
 
-You don't actually need to implement Drop if you contain types that implement
-Drop, and all you'd want to do is call *their* destructors. In the case of
-List, all it would want to do is drop its head, which in turn would *maybe*
-try to drop a `Box<Node>`. All that's handled for us automatically... with one
-hitch.
+Вам на самом деле не нужно реализовывать `Drop`, если вы содержите типы, которые реализуют
+`Drop`, и все, что вы хотите сделать, — это вызвать *их* деструкторы. В случае
+`List` все, что он хотел бы сделать, — это удалить свой `head`, который, в свою очередь, *возможно*,
+попытался бы удалить `Box<Node>`. Все это обрабатывается для нас автоматически... с одной
+зацепкой.
 
-The automatic handling is going to be bad.
+Автоматическая обработка будет плохой.
 
-Let's consider a simple list:
+Давайте рассмотрим простой список:
 
 
 ```text
 list -> A -> B -> C
 ```
 
-When `list` gets dropped, it will try to drop A, which will try to drop B,
-which will try to drop C. Some of you might rightly be getting nervous. This is
-recursive code, and recursive code can blow the stack!
+Когда `list` удаляется, он пытается удалить `A`, который пытается удалить `B`,
+который пытается удалить `C`. Некоторые из вас могут справедливо начать нервничать. Это
+рекурсивный код, и рекурсивный код может переполнить стек (blow the stack)!
 
-Some of you might be thinking "this is clearly tail recursive, and any decent
-language would ensure that such code wouldn't blow the stack". This is, in fact,
-incorrect! To see why, let's try to write what the compiler has to do, by
-manually implementing Drop for our List as the compiler would:
+Некоторые из вас могут подумать: «это явно хвостовая рекурсия (tail recursive), и любой приличный
+язык гарантировал бы, что такой код не переполнит стек». Это, на самом деле,
+неверно! Чтобы понять почему, давайте попробуем написать то, что должен делать компилятор,
+вручную реализовав `Drop` для нашего `List` так, как это сделал бы компилятор:
 
 
 ```rust ,ignore
 impl Drop for List {
     fn drop(&mut self) {
-        // NOTE: you can't actually explicitly call `drop` in real Rust code;
-        // we're pretending to be the compiler!
-        self.head.drop(); // tail recursive - good!
+        // ПРИМЕЧАНИЕ: вы не можете явно вызывать `drop` в реальном коде на Rust;
+        // мы притворяемся компилятором!
+        self.head.drop(); // хвостовая рекурсия — хорошо!
     }
 }
 
 impl Drop for Link {
     fn drop(&mut self) {
         match *self {
-            Link::Empty => {} // Done!
+            Link::Empty => {} // Готово!
             Link::More(ref mut boxed_node) => {
-                boxed_node.drop(); // tail recursive - good!
+                boxed_node.drop(); // хвостовая рекурсия — хорошо!
             }
         }
     }
@@ -65,7 +65,7 @@ impl Drop for Link {
 
 impl Drop for Box<Node> {
     fn drop(&mut self) {
-        self.ptr.drop(); // uh oh, not tail recursive!
+        self.ptr.drop(); // ох, это не хвостовая рекурсия!
         deallocate(self.ptr);
     }
 }
@@ -77,21 +77,21 @@ impl Drop for Node {
 }
 ```
 
-We *can't* drop the contents of the Box *after* deallocating, so there's no
-way to drop in a tail-recursive manner! Instead we're going to have to manually
-write an iterative drop for `List` that hoists nodes out of their boxes.
+Мы *не можем* удалить содержимое `Box` *после* освобождения памяти, поэтому нет
+способа выполнить удаление в хвостово-рекурсивной манере! Вместо этого нам придется вручную
+написать итеративный `drop` для `List`, который извлекает узлы из их боксов.
 
 
 ```rust ,ignore
 impl Drop for List {
     fn drop(&mut self) {
         let mut cur_link = mem::replace(&mut self.head, Link::Empty);
-        // `while let` == "do this thing until this pattern doesn't match"
+        // `while let` == "делай это, пока этот шаблон совпадает"
         while let Link::More(mut boxed_node) = cur_link {
             cur_link = mem::replace(&mut boxed_node.next, Link::Empty);
-            // boxed_node goes out of scope and gets dropped here;
-            // but its Node's `next` field has been set to Link::Empty
-            // so no unbounded recursion occurs.
+            // boxed_node выходит из области видимости и удаляется здесь;
+            // но поле `next` структуры Node было установлено в Link::Empty,
+            // поэтому неограниченной рекурсии не происходит.
         }
     }
 }
@@ -109,25 +109,25 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured
 
 ```
 
-Great!
+Отлично!
 
 ----------------------
 
 <span style="float:left">![Bonus](img/profbee.gif)</span>
 
-## Bonus Section For Premature Optimization!
+## Бонусный раздел для преждевременной оптимизации (Premature Optimization)!
 
-Our implementation of drop is actually *very* similar to
-`while let Some(_) = self.pop() { }`, which is certainly simpler. How is
-it different, and what performance issues could result from it once we start
-generalizing our list to store things other than integers?
+Наша реализация `drop` на самом деле *очень* похожа на
+`while let Some(_) = self.pop() { }`, что, безусловно, проще. Чем она
+отличается и к каким проблемам с производительностью это может привести, когда мы начнем
+обобщать наш список для хранения вещей, отличных от целых чисел?
 
 <details>
-  <summary>Click to expand for answer</summary>
+  <summary>Нажмите, чтобы развернуть ответ</summary>
 
-Pop returns `Option<i32>`, while our implementation only manipulates Links (`Box<Node>`). So our implementation only moves around pointers to nodes, while the pop-based one will move around the values we stored in nodes. This could be very expensive if we generalize our list and someone uses it to store instances of VeryBigThingWithADropImpl (VBTWADI). Box is able to run the drop implementation of its contents in-place, so it doesn't suffer from this issue. Since VBTWADI is *exactly* the kind of thing that actually makes using a linked-list desirable over an array, behaving poorly on this case would be a bit of a disappointment.
+`pop` возвращает `Option<i32>`, в то время как наша реализация манипулирует только ссылками `Link` (`Box<Node>`). Таким образом, наша реализация только перемещает указатели на узлы, в то время как реализация на основе `pop` будет перемещать значения, которые мы сохранили в узлах. Это может быть очень дорого, если мы обобщим наш список и кто-то будет использовать его для хранения экземпляров `VeryBigThingWithADropImpl` (VBTWADI — ОченьБольшаяШтукаСРеализациейDrop). `Box` может запускать реализацию `drop` своего содержимого на месте (in-place), поэтому он не страдает от этой проблемы. Поскольку `VBTWADI` — это *именно* тот тип вещей, который делает использование связанного списка предпочтительным по сравнению с массивом, плохая производительность в этом случае была бы разочарованием.
 
-If you wish to have the best of both implementations, you could add a new method,
-`fn pop_node(&mut self) -> Link`, from-which `pop` and `drop` can both be cleanly derived.
+Если вы хотите получить лучшее от обеих реализаций, вы можете добавить новый метод
+`fn pop_node(&mut self) -> Link`, из которого можно чисто вывести как `pop`, так и `drop`.
 
 </details>

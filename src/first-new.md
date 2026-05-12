@@ -1,26 +1,26 @@
-# New
+# Создание (New)
 
-To associate actual code with a type, we use `impl` blocks:
+Чтобы связать фактический код с типом, мы используем блоки `impl`:
 
 ```rust ,ignore
 impl List {
-    // TODO, make code happen
+    // TODO, написать код
 }
 ```
 
-Now we just need to figure out how to actually write code. In Rust we declare
-a function like so:
+Теперь нам просто нужно понять, как на самом деле писать код. В Rust мы объявляем
+функцию следующим образом:
 
 ```rust ,ignore
 fn foo(arg1: Type1, arg2: Type2) -> ReturnType {
-    // body
+    // тело функции
 }
 ```
 
-The first thing we want is a way to *construct* a list. Since we hide the
-implementation details, we need to provide that as a function. The usual way
-to do that in Rust is to provide a static method, which is just a
-normal function inside an `impl`:
+Первое, что нам нужно, — это способ *создать* список. Поскольку мы скрываем детали
+реализации, нам нужно предоставить его в виде функции. Обычный способ
+сделать это в Rust — предоставить статический метод, который является просто
+обычной функцией внутри `impl`:
 
 ```rust ,ignore
 impl List {
@@ -30,36 +30,13 @@ impl List {
 }
 ```
 
-A few notes on this:
+Несколько замечаний по этому поводу:
 
-* Self is an alias for "that type I wrote at the top next to `impl`". Great for
-  not repeating yourself!
-* We create an instance of a struct in much the same way we declare it, except
-  instead of providing the types of its fields, we initialize them with values.
-* We refer to variants of an enum using `::`, which is the namespacing operator.
-* The last expression of a function is implicitly returned.
-  This makes simple functions a little neater. You can still use `return`
-  to return early like other C-like languages.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+* `Self` — это псевдоним для «того типа, который я написал вверху рядом с `impl`». Отлично подходит для того,
+  чтобы не повторяться!
+* Мы создаем экземпляр структуры практически так же, как и объявляем ее, за исключением того,
+  что вместо указания типов ее полей мы инициализируем их значениями.
+* Мы обращаемся к вариантам перечисления с помощью `::`, который является оператором пространства имен.
+* Последнее выражение функции возвращается неявно.
+  Это делает простые функции немного чище. Вы все еще можете использовать `return`
+  для досрочного возврата, как в других Си-подобных языках.

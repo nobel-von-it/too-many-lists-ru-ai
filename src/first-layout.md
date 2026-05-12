@@ -1,37 +1,37 @@
-# Basic Data Layout
+# Базовая структура данных (Basic Data Layout)
 
-Alright, so what's a linked list? Well basically, it's a bunch of pieces of data
-on the heap (hush, kernel people!) that point to each other in sequence. Linked
-lists are something procedural programmers shouldn't touch with a 10-foot pole,
-and what functional programmers use for everything. It seems fair, then, that we
-should ask functional programmers for the definition of a linked list. They will
-probably give you something like the following definition:
+Итак, что такое связанный список? Ну, в сущности, это набор элементов данных
+в куче (heap) (тише, системщики!), которые последовательно указывают друг на друга. Связанные
+списки — это то, к чему процедурные программисты не должны прикасаться и трехметровой палкой,
+и то, что функциональные программисты используют для всего. Кажется справедливым, тогда,
+что мы должны спросить функциональных программистов об определении связанного списка. Они,
+вероятно, дадут вам что-то вроде следующего определения:
 
 ```haskell
 List a = Empty | Elem a (List a)
 ```
 
-Which reads approximately as "A List is either Empty or an Element followed by a
-List". This is a recursive definition expressed as a *sum type*, which is a
-fancy name for "a type that can have different values which may be different
-types". Rust calls sum types `enum`s! If you're coming from a C-like language,
-this is exactly the enum you know and love, but in overdrive. So let's
-transcribe this functional definition into Rust!
+Что читается примерно как «Список — это либо Пусто (Empty), либо Элемент (Elem), за которым следует
+Список». Это рекурсивное определение, выраженное как *тип-сумма (sum type)*, что является
+причудливым названием для «типа, который может иметь различные значения, которые могут быть разными
+типами». Rust называет типы-суммы перечислениями — `enum`! Если вы пришли из Си-подобного языка,
+это именно то перечисление, которое вы знаете и любите, но на стероидах. Так что давайте
+перенесем это функциональное определение в Rust!
 
-For now we'll avoid generics to keep things simple. We'll only support
-storing signed 32-bit integers:
+Пока мы избегаем обобщений (generics), чтобы все было просто. Мы будем поддерживать
+только хранение знаковых 32-битных целых чисел:
 
 ```rust ,ignore
-// in first.rs
+// в first.rs
 
-// pub says we want people outside this module to be able to use List
+// pub говорит о том, что мы хотим, чтобы люди за пределами этого модуля могли использовать List
 pub enum List {
     Empty,
     Elem(i32, List),
 }
 ```
 
-*phew*, I'm swamped. Let's just go ahead and compile that:
+*Уф*, я завален работой. Давайте просто возьмем и скомпилируем это:
 
 ```text
 > cargo build
@@ -48,37 +48,38 @@ error[E0072]: recursive type `first::List` has infinite size
   = help: insert indirection (e.g., a `Box`, `Rc`, or `&`) at some point to make `first::List` representable
 ```
 
-Well. I don't know about you, but I certainly feel betrayed by the functional
-programming community.
+Что ж. Не знаю как вы, но я определенно чувствую себя преданным сообществом функционального
+программирования.
 
-If we actually check out the error message (after we get over the whole
-betrayal thing), we can see that rustc is actually telling us exactly
-how to solve this problem:
+Если мы действительно посмотрим на сообщение об ошибке (после того, как переживем всю эту
+историю с предательством), мы увидим, что `rustc` на самом деле говорит нам ровно то,
+как решить эту проблему:
 
 > insert indirection (e.g., a `Box`, `Rc`, or `&`) at some point to make `first::List` representable
+> (вставьте косвенность (например, `Box`, `Rc` или `&`) в каком-то месте, чтобы сделать `first::List` представимым)
 
-Alright, `box`. What's that? Let's google `rust box`...
+Ладно, `box`. Что это такое? Давайте загуглим `rust box`...
 
 > [std::boxed::Box - Rust](https://doc.rust-lang.org/std/boxed/struct.Box.html)
 
-Lesse here...
+Посмотрим здесь...
 
 > `pub struct Box<T>(_);`
 >
-> A pointer type for heap allocation.
-> See the [module-level documentation](https://doc.rust-lang.org/std/boxed/) for more.
+> Тип указателя для выделения памяти в куче.
+> См. [документацию на уровне модуля](https://doc.rust-lang.org/std/boxed/) для получения дополнительной информации.
 
-*clicks link*
+*кликает по ссылке*
 
-> `Box<T>`, casually referred to as a 'box', provides the simplest form of heap allocation in Rust. Boxes provide ownership for this allocation, and drop their contents when they go out of scope.
+> `Box<T>`, обычно называемый просто «box» (коробка), обеспечивает простейшую форму выделения памяти в куче в Rust. Боксы обеспечивают владение (ownership) этим выделением и удаляют свое содержимое, когда выходят из области видимости.
 >
-> Examples
+> Примеры
 >
-> Creating a box:
+> Создание бокса:
 >
 > `let x = Box::new(5);`
 >
-> Creating a recursive data structure:
+> Создание рекурсивной структуры данных:
 >
 ```rust
 #[derive(Debug)]
@@ -95,19 +96,19 @@ fn main() {
 }
 ```
 >
-> This will print `Cons(1, Box(Cons(2, Box(Nil))))`.
+> Это выведет `Cons(1, Box(Cons(2, Box(Nil))))`.
 >
-> Recursive structures must be boxed, because if the definition of Cons looked like this:
+> Рекурсивные структуры должны быть обернуты в бокс (boxed), потому что если бы определение Cons выглядело так:
 >
 > `Cons(T, List<T>),`
 >
-> It wouldn't work. This is because the size of a List depends on how many elements are in the list, and so we don't know how much memory to allocate for a Cons. By introducing a Box, which has a defined size, we know how big Cons needs to be.
+> Это бы не сработало. Это связано с тем, что размер `List` зависит от того, сколько элементов находится в списке, и поэтому мы не знаем, сколько памяти нужно выделить для `Cons`. Вводя `Box`, который имеет определенный размер, мы знаем, какого размера должен быть `Cons`.
 
-Wow, uh. That is perhaps the most relevant and helpful documentation I have ever seen. Literally the first thing in the documentation is *exactly what we're trying to write, why it didn't work, and how to fix it*.
+Вау, ух. Это, пожалуй, самая актуальная и полезная документация, которую я когда-либо видел. Буквально первое, что есть в документации, — это *именно то, что мы пытаемся написать, почему это не сработало и как это исправить*.
 
-Dang, docs rule.
+Черт возьми, документация рулит.
 
-Ok, let's do that:
+Ладно, давайте так и сделаем:
 
 ```rust ,ignore
 pub enum List {
@@ -122,38 +123,38 @@ pub enum List {
    Finished dev [unoptimized + debuginfo] target(s) in 0.22s
 ```
 
-Hey it built!
+Эй, оно собралось!
 
-...but this is actually a really foolish definition of a List, for a few reasons.
+...но на самом деле это очень глупое определение `List`, по нескольким причинам.
 
-Consider a list with two elements:
+Рассмотрим список с двумя элементами:
 
 ```text
-[] = Stack
-() = Heap
+[] = Стек (Stack)
+() = Куча (Heap)
 
 [Elem A, ptr] -> (Elem B, ptr) -> (Empty, *junk*)
 ```
 
-There are two key issues:
+Здесь есть две ключевые проблемы:
 
-* We're allocating a node that just says "I'm not actually a Node"
-* One of our nodes isn't heap-allocated at all.
+* Мы выделяем память под узел (node), который просто говорит: «Я на самом деле не узел».
+* Один из наших узлов вообще не выделен в куче.
 
-On the surface, these two seem to cancel each-other out. We heap-allocate an
-extra node, but one of our nodes doesn't need to be heap-allocated at all.
-However, consider the following potential layout for our list:
+На первый взгляд кажется, что эти две проблемы компенсируют друг друга. Мы выделяем в куче
+лишний узел, но один из наших узлов вообще не требует выделения в куче.
+Однако рассмотрим следующую потенциальную структуру для нашего списка:
 
 ```text
 [ptr] -> (Elem A, ptr) -> (Elem B, *null*)
 ```
 
-In this layout we now unconditionally heap allocate our nodes. The
-key difference is the absence of the *junk* from our first layout. What is
-this junk? To understand that, we'll need to look at how an enum is laid out
-in memory.
+В этой структуре мы теперь безоговорочно выделяем память для наших узлов в куче.
+Ключевое отличие заключается в отсутствии *мусора (junk)* из нашей первой структуры. Что это
+за мусор? Чтобы понять это, нам нужно посмотреть, как перечисление (`enum`) располагается
+в памяти.
 
-In general, if we have an enum like:
+В общем случае, если у нас есть перечисление вида:
 
 ```rust ,ignore
 enum Foo {
@@ -164,57 +165,57 @@ enum Foo {
 }
 ```
 
-A Foo will need to store some integer to indicate which *variant* of the enum it
-represents (`D1`, `D2`, .. `Dn`). This is the *tag* of the enum. It will also
-need enough space to store the *largest* of `T1`, `T2`, .. `Tn` (plus some extra
-space to satisfy alignment requirements).
+Для `Foo` потребуется сохранить некоторое целое число, чтобы указать, какой *вариант (variant)* перечисления он
+представляет (`D1`, `D2`, .. `Dn`). Это *тег (tag)* перечисления. Ему также
+потребуется достаточно места для хранения *наибольшего* из `T1`, `T2`, .. `Tn` (плюс некоторое дополнительное
+пространство для удовлетворения требований выравнивания — alignment).
 
-The big takeaway here is that even though `Empty` is a single bit of
-information, it necessarily consumes enough space for a pointer and an element,
-because it has to be ready to become an `Elem` at any time. Therefore the first
-layout heap allocates an extra element that's just full of junk, consuming a
-bit more space than the second layout.
+Главный вывод здесь заключается в том, что хотя `Empty` — это всего один бит
+информации, он обязательно потребляет достаточно места для указателя и элемента,
+потому что он должен быть готов стать `Elem` в любое время. Поэтому первая
+структура выделяет в куче лишний элемент, который просто заполнен мусором, потребляя
+чуть больше места, чем вторая структура.
 
-One of our nodes not being allocated at all is also, perhaps surprisingly,
-*worse* than always allocating it. This is because it gives us a *non-uniform*
-node layout. This doesn't have much of an appreciable effect on pushing and
-popping nodes, but it does have an effect on splitting and merging lists.
+То, что один из наших узлов вообще не выделяется, также, возможно, удивительно,
+*хуже*, чем всегда выделять его. Это связано с тем, что это дает нам *неравномерную*
+структуру узлов. Это не оказывает заметного влияния на добавление (`push`) и
+извлечение (`pop`) узлов, но влияет на разделение и слияние списков.
 
-Consider splitting a list in both layouts:
+Рассмотрим разделение списка в обеих структурах:
 
 ```text
-layout 1:
+структура 1:
 
 [Elem A, ptr] -> (Elem B, ptr) -> (Elem C, ptr) -> (Empty *junk*)
 
-split off C:
+разделяем C:
 
 [Elem A, ptr] -> (Elem B, ptr) -> (Empty *junk*)
 [Elem C, ptr] -> (Empty *junk*)
 ```
 
 ```text
-layout 2:
+структура 2:
 
 [ptr] -> (Elem A, ptr) -> (Elem B, ptr) -> (Elem C, *null*)
 
-split off C:
+разделяем C:
 
 [ptr] -> (Elem A, ptr) -> (Elem B, *null*)
 [ptr] -> (Elem C, *null*)
 ```
 
-Layout 2's split involves just copying B's pointer to the stack and nulling
-the old value out. Layout 1 ultimately does the same thing, but also has to
-copy C from the heap to the stack. Merging is the same process in reverse.
+Разделение в структуре 2 включает в себя просто копирование указателя `B` в стек и зануление
+старого значения. Структура 1 в конечном итоге делает то же самое, но также должна
+скопировать `C` из кучи в стек. Слияние — это тот же процесс в обратном порядке.
 
-One of the few nice things about a linked list is that you can construct the
-element in the node itself, and then freely shuffle it around lists without
-ever moving it. You just fiddle with pointers and stuff gets "moved". Layout 1
-trashes this property.
+Одна из немногих приятных особенностей связанного списка заключается в том, что вы можете создать
+элемент в самом узле, а затем свободно перемещать его по спискам,
+никогда не перемещая его физически в памяти. Вы просто возитесь с указателями, и объекты «перемещаются». Структура 1
+разрушает это свойство.
 
-Alright, I'm reasonably convinced Layout 1 is bad. How do we rewrite our List?
-Well, we could do something like:
+Ладно, я достаточно убежден, что Структура 1 плоха. Как нам переписать наш `List`?
+Ну, мы могли бы сделать что-то вроде:
 
 ```rust ,ignore
 pub enum List {
@@ -224,18 +225,18 @@ pub enum List {
 }
 ```
 
-Hopefully this seems like an even worse idea to you. Most notably, this really
-complicates our logic, because there is now a completely invalid state:
-`ElemThenNotEmpty(0, Box(Empty))`. It also *still* suffers from non-uniformly
-allocating our elements.
+Надеюсь, вам это кажется еще более плохой идеей. Что наиболее важно, это действительно
+усложняет нашу логику, потому что теперь появляется совершенно недопустимое состояние:
+`ElemThenNotEmpty(0, Box(Empty))`. Это также *по-прежнему* страдает от неравномерного
+выделения памяти для наших элементов.
 
-However it does have *one* interesting property: it totally avoids allocating
-the Empty case, reducing the total number of heap allocations by 1. Unfortunately,
-in doing so it manages to waste *even more space*! This is because the previous
-layout took advantage of the *null pointer optimization*.
+Однако у этого подхода есть *одно* интересное свойство: он полностью избегает выделения памяти для
+случая `Empty`, сокращая общее количество выделений памяти в куче на 1. К сожалению,
+при этом он умудряется тратить *еще больше места*! Это потому, что предыдущая
+структура использовала преимущество *оптимизации нулевого указателя (null pointer optimization)*.
 
-We previously saw that every enum has to store a *tag* to specify which variant
-of the enum its bits represent. However, if we have a special kind of enum:
+Ранее мы видели, что каждое перечисление должно хранить *тег*, чтобы указать, какой вариант
+перечисления представляют его биты. Однако, если у нас есть специальный вид перечисления:
 
 ```rust,ignore
 enum Foo {
@@ -244,31 +245,30 @@ enum Foo {
 }
 ```
 
-the null pointer optimization kicks in, which *eliminates the space needed for
-the tag*. If the variant is A, the whole enum is set to all `0`'s. Otherwise,
-the variant is B. This works because B can never be all `0`'s, since it contains
-a non-zero pointer. Slick!
+срабатывает оптимизация нулевого указателя, которая *устраняет необходимость в месте для
+тега*. Если вариантом является `A`, все перечисление устанавливается во все `0`. В противном случае,
+вариант — `B`. Это работает, потому что `B` никогда не может быть равен всем `0`, так как он содержит
+ненулевой указатель. Ловко!
 
-Can you think of other enums and types that could do this kind of optimization?
-There's actually a lot! This is why Rust leaves enum layout totally unspecified.
-There are a few more complicated enum layout optimizations that Rust will do for
-us, but the null pointer one is definitely the most important!
-It means `&`, `&mut`, `Box`, `Rc`, `Arc`, `Vec`, and
-several other important types in Rust have no overhead when put in an `Option`!
-(We'll get to most of these in due time.)
+Можете ли вы подумать о других перечислениях и типах, которые могли бы использовать такую оптимизацию?
+Их на самом деле много! Вот почему Rust оставляет расположение перечислений в памяти совершенно не определенным.
+Есть еще несколько более сложных оптимизаций расположения перечислений, которые Rust сделает за
+нас, но оптимизация нулевого указателя, безусловно, самая важная!
+Это означает, что `&`, `&mut`, `Box`, `Rc`, `Arc`, `Vec` и
+некоторые другие важные типы в Rust не имеют накладных расходов при помещении в `Option`!
+(Мы доберемся до большинства из них в свое время.)
 
-So how do we avoid the extra junk, uniformly allocate, *and* get that sweet
-null-pointer optimization? We need to better separate out the idea of having an
-element from allocating another list. To do this, we have to think a little more
-C-like: structs!
+Так как же нам избежать лишнего мусора, равномерно выделять память *и* получить эту приятную
+оптимизацию нулевого указателя? Нам нужно лучше отделить идею наличия
+элемента от выделения памяти под другой список. Для этого нам нужно подумать немного более
+по-сишному: структуры (`struct`)!
 
-While enums let us declare a type that can contain *one* of several values,
-structs let us declare a type that contains *many* values at once. Let's break
-our List into two types: A List, and a Node.
+В то время как перечисления (`enum`) позволяют нам объявлять тип, который может содержать *один* из нескольких вариантов,
+структуры (`struct`) позволяют нам объявлять тип, который содержит *много* значений одновременно. Давайте разобьем
+наш `List` на два типа: `List` и `Node` (Узел).
 
-As before, a List is either Empty or has an element followed by another List.
-By representing the "has an element followed by another List" case by an
-entirely separate type, we can hoist the Box to be in a more optimal position:
+Как и прежде, `List` — это либо `Empty`, либо элемент, за которым следует другой `List`.
+Представляя случай «имеет элемент, за которым следует другой список» совершенно отдельным типом, мы можем поднять `Box` в более оптимальное положение:
 
 ```rust ,ignore
 struct Node {
@@ -282,15 +282,15 @@ pub enum List {
 }
 ```
 
-Let's check our priorities:
+Давайте проверим наши приоритеты:
 
-* Tail of a list never allocates extra junk: check!
-* `enum` is in delicious null-pointer-optimized form: check!
-* All elements are uniformly allocated: check!
+* Хвост списка никогда не выделяет лишний мусор: готово!
+* `enum` находится в восхитительной оптимизированной по нулевому указателю форме: готово!
+* Все элементы выделяются равномерно: готово!
 
-Alright! We actually just constructed exactly the layout that we used to
-demonstrate that our first layout (as suggested by the official Rust
-documentation) was problematic.
+Отлично! Мы фактически только что создали именно ту структуру, которую использовали для
+демонстрации того, что наша первая структура (предложенная официальной документацией
+Rust) была проблематичной.
 
 ```text
 > cargo build
@@ -308,12 +308,12 @@ warning: private type `first::Node` in public interface (error E0446)
 
 :(
 
-Rust is mad at us again. We marked the `List` as public (because we want people
-to be able to use it), but not the `Node`. The problem is that the internals of
-an `enum` are totally public, and we're not allowed to publicly talk about
-private types. We could make all of `Node` totally public, but generally in Rust
-we favour keeping implementation details private. Let's make `List` a struct, so
-that we can hide the implementation details:
+Rust снова сердится на нас. Мы пометили `List` как публичный (потому что мы хотим, чтобы люди
+могли его использовать), но не `Node`. Проблема в том, что внутренности
+`enum` полностью публичны, и нам не разрешено публично говорить о
+приватных типах. Мы могли бы сделать весь `Node` полностью публичным, но обычно в Rust
+мы предпочитаем держать детали реализации приватными. Давайте сделаем `List` структурой, чтобы
+мы могли скрыть детали реализации:
 
 ```rust ,ignore
 pub struct List {
@@ -331,8 +331,8 @@ struct Node {
 }
 ```
 
-Because `List` is a struct with a single field, its size is the same as that
-field. Yay zero-cost abstractions!
+Поскольку `List` — это структура с одним полем, ее размер равен размеру этого
+поля. Ура абстракциям с нулевой стоимостью (zero-cost abstractions)!
 
 ```text
 > cargo build
@@ -371,8 +371,8 @@ warning: field is never used: `next`
 
 ```
 
-Alright, that compiled! Rust is pretty mad, because as far as it can tell,
-everything we've written is totally useless: we never use `head`, and no one who
-uses our library can either since it's private. Transitively, that means Link
-and Node are useless too. So let's solve that! Let's implement some code for our
-List!
+Отлично, оно скомпилировалось! Rust довольно зол, потому что, насколько он может судить,
+все, что мы написали, совершенно бесполезно: мы никогда не используем `head`, и никто, кто
+использует нашу библиотеку, тоже не может этого сделать, так как она приватна. Транзитивно это означает, что `Link`
+и `Node` тоже бесполезны. Давайте решим эту проблему! Давайте напишем код для нашего
+`List`!
