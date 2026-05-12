@@ -1,50 +1,50 @@
-# Unsafe Rust
+# Небезопасный Rust (Unsafe Rust)
 
-This is a serious, big, complicated, and dangerous topic.
-It's so serious that I wrote [an entire other book][nom] on it.
+Это серьезная, большая, сложная и опасная тема.
+Она настолько серьезна, что я написал [целую отдельную книгу][nom] об этом.
 
-The long and the short of it is that *every* language is actually unsafe as soon
-as you allow calling into other languages, because you can just have C do
-arbitrarily bad things. Yes: Java, Python, Ruby, Haskell... everyone is wildly
-unsafe in the face of Foreign Function Interfaces (FFI).
+Суть в том, что *любой* язык на самом деле становится небезопасным, как только
+вы разрешаете вызывать код на других языках, потому что вы можете просто заставить Си делать
+произвольно плохие вещи. Да: Java, Python, Ruby, Haskell... все они дико
+небезопасны перед лицом интерфейсов внешних функций (Foreign Function Interfaces, FFI).
 
-Rust embraces this truth by splitting itself into two languages: Safe Rust, and
-Unsafe Rust. So far we've only worked with Safe Rust. It's completely 100%
-safe... except that it can FFI into Unsafe Rust.
+Rust принимает эту истину, разделяя себя на два языка: Безопасный Rust (Safe Rust) и
+Небезопасный Rust (Unsafe Rust). До сих пор мы работали только с Безопасным Rust. Он полностью, на 100%
+безопасен... за исключением того, что он может вызывать через FFI Небезопасный Rust.
 
-Unsafe Rust is a *superset* of Safe Rust. It's completely the same as Safe Rust in all its
-semantics and rules, you're just allowed to do a few *extra* things that are
-wildly unsafe and can cause the dreaded Undefined Behaviour that haunts C.
+Небезопасный Rust — это *надмножество (superset)* Безопасного Rust. Он абсолютно такой же, как и Безопасный Rust во всех своих
+семантиках и правилах, вам просто разрешено делать несколько *дополнительных* вещей, которые
+дико небезопасны и могут вызвать ужасное Неопределенное Поведение (Undefined Behaviour), которое преследует Си.
 
-Again, this is a really huge topic that has a lot of interesting corner cases.
-I *really* don't want to go really deep into it (well, I do. I did. [Read that
-book][nom]). That's ok, because with linked lists we can actually ignore almost
-all of it.
+Опять же, это действительно огромная тема, в которой много интересных пограничных случаев.
+Я *правда* не хочу погружаться в нее слишком глубоко (ну, вообще-то хочу. И погрузился. [Прочитайте ту
+книгу][nom]). Это нормально, потому что со связанными списками мы можем фактически игнорировать почти
+всё это.
 
-> **NARRATOR:** This was a lie, but it did seem true in 2015.
+> **РАССКАЗЧИК (NARRATOR):** Это было ложью, но в 2015 году это казалось правдой.
 
-The main Unsafe tool we'll be using are *raw pointers*. Raw pointers are
-basically C's pointers. They have no inherent aliasing rules. They have no
-lifetimes. They can be null. They can be misaligned. They can be dangling. They can point to
-uninitialized memory. They can be cast to and from integers. They can be cast
-to point to a different type. Mutability? Cast it. Pretty much everything goes,
-and that means pretty much anything can go wrong.
+Основным инструментом `Unsafe`, который мы будем использовать, являются *сырые указатели (raw pointers)*. Сырые указатели — это,
+по сути, указатели Си. У них нет врожденных правил алиасинга (aliasing rules). У них нет
+времен жизни. Они могут быть нулевыми (null). Они могут быть не выровнены. Они могут быть висячими (dangling). Они могут указывавать на
+неинициализированную память. Их можно преобразовывать в целые числа и обратно. Их можно приводить к
+другому типу. Изменяемость? Приведите тип. Практически всё дозволено,
+а это значит, что практически всё может пойти не так.
 
-> **NARRATOR:** no inherent aliasing rules, eh? Ah, the innocence of youth.
+> **РАССКАЗЧИК (NARRATOR):** нет врожденных правил алиасинга, да? Ах, наивность молодости.
 
-This is some bad stuff and honestly you'll live a happier life never having
-to touch these. Unfortunately, we want to write linked lists, and linked lists
-are awful. That means we're going to have to use unsafe pointers.
+Это плохие штуки, и, честно говоря, ваша жизнь была бы счастливее, если бы вам никогда не пришлось
+с ними сталкиваться. К сожалению, мы хотим писать связанные списки, а связанные списки
+ужасны. Это значит, что нам придется использовать небезопасные указатели.
 
-There are two kinds of raw pointer: `*const T` and `*mut T`. These are meant to
-be `const T*` and `T*` from C, but we really don't care about what C thinks they
-mean that much. You can only dereference a `*const T` to an `&T`, but much like
-the mutability of a variable, this is just a lint against incorrect usage. At
-most it just means you have to cast the `*const` to a `*mut` first. Although if
-you don't actually have permission to mutate the referent of the pointer,
-you're gonna have a bad time.
+Существует два вида сырых указателей: `*const T` and `*mut T`. Они призваны
+быть аналогами `const T*` и `T*` из Си, но нас не особо волнует то, что Си думает об их
+значении. Вы можете разыменовать `*const T` только в `&T`, но, как и в случае с
+изменяемостью переменной, это всего лишь предупреждение против некорректного использования. В
+худшем случае это просто означает, что вам сначала нужно привести `*const` к `*mut`. Хотя, если
+у вас на самом деле нет разрешения на изменение того, на что указывает указатель,
+вам придется несладко.
 
-Anyway, we'll get a better feel for this as we write some code. For now,
+В любом случае, мы лучше поймем это, когда напишем немного кода. А пока:
 `*mut T == &unchecked mut T`!
 
 [nom]: https://doc.rust-lang.org/nightly/nomicon/

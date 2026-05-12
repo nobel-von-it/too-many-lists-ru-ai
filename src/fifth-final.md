@@ -1,12 +1,12 @@
-# Final Code
+# Конечный код (Final Code)
 
-Alright, so with a teeny-tiny dash of unsafety we managed to get a linear
-time improvement over the naive safe queue, and we managed to reuse almost
-all of the logic from the safe stack!
+Итак, с крошечной щепоткой небезопасности (unsafety) нам удалось получить линейное
+улучшение времени по сравнению с наивной безопасной очередью, и нам удалось повторно использовать почти
+всю логику из безопасного стека!
 
-You know, except for that part where miri completely dunked on us and we had to write a short master's thesis on rust's memory model. You know, as you do.
+Ну, за исключением той части, где Miri полностью разгромил нас, и нам пришлось написать небольшую магистерскую диссертацию по модели памяти Rust. Ну, как обычно.
 
-But on the bright side we *didn't* have to write any jank Rc or RefCell stuff.
+Но с другой стороны, нам *не пришлось* писать никакой кривой код с `Rc` или `RefCell`.
 
 ```rust
 use std::ptr;

@@ -1,44 +1,42 @@
-# Testing Stacked Borrows
+# Тестирование Stacked Borrows
 
-> TL;DR of the previous section's (simplified) memory model for Rust:
+> Краткое содержание (TL;DR) предыдущего раздела об (упрощенной) модели памяти для Rust:
 >
-> * Rust conceptually handles reborrows by maintaining a "borrow stack"
-> * Only the one on the top of the stack is "live" (has exclusive access)
-> * When you access a lower one it becomes "live" and the ones above it get popped
-> * You're not allowed to use pointers that have been popped from the borrow stack
-> * The borrowchecker ensures safe code code obeys this
-> * Miri theoretically checks that raw pointers obey this at runtime
+> * Концептуально Rust обрабатывает перезаимствования, поддерживая «стек заимствований» (borrow stack).
+> * Только тот, кто находится на вершине стека, является «живым» (имеет эксклюзивный доступ).
+> * Когда вы обращаетесь к более низкому элементу, он становится «живым», а элементы выше него выталкиваются (popped).
+> * Вам не разрешено использовать указатели, которые были вытолкнуты из стека заимствований.
+> * Borrowchecker гарантирует, что безопасный код подчиняется этому правилу.
+> * Miri теоретически проверяет, что сырые указатели подчиняются этому правилу во время выполнения.
 
-That was a lot of theory and ideas -- let's move on to the true heart and soul of this book: writing some bad code and getting our tools to scream at us. We're going to go through a *ton* of examples to try to see if our mental model makes sense, and to try to get an intuitive feel for stacked borrows.
+Это было много теории и идей — давайте перейдем к истинной сути и душе этой книги: написанию плохого кода и заставлению наших инструментов кричать на нас. Мы собираемся пройти через *кучу* примеров, чтобы попытаться увидеть, имеет ли смысл наша ментальная модель, и попытаться получить интуитивное представление о stacked borrows.
 
-> **NARRATOR:** Catching Undefined Behaviour in practice is a hairy business. After all, you're dealing with situations that the compiler literally *assumes* don't happen.
+> **РАССКАЗЧИК (NARRATOR):** Отлов Неопределенного Поведения на практике — дело непростое (hairy business). В конце концов, вы имеете дело с ситуациями, которые компилятор буквально *предполагает* невозможными.
 >
-> If you're lucky, things will "seem to work" today, but they'll be a ticking time bomb for a Smarter Compiler or slight change to the code. If you're *really* lucky things will reliably crash so you can just catch the mistake and fix it. But if you're unlucky, then things will be broken in weird and baffling ways.
+> Если вы удачливы, то сегодня всё будет «казаться работающим», но это будет бомба замедленного действия для Более Умного Компилятора или незначительного изменения в коде. Если вы *очень* удачливы, то всё будет надежно падать, так что вы сможете просто отловить ошибку и исправить ее. Но если вы неудачливы, то всё сломается странными и сбивающими с толку способами.
 >
-> Miri tries to work around this by getting rustc's most naive and unoptimized view of the program and tracking extra state as it interprets. As far as "sanitizers" go, this is a fairly deterministic and robust approach but it will never be *perfect*. You need your test program to actually have an execution with that UB, and for a large enough program it's very easy to introduce all sorts of non-determinism (HashMaps use RNG by default!).
+> Miri пытается обойти это, получая самый наивный и неоптимизированный взгляд `rustc` на программу и отслеживая дополнительное состояние по мере ее интерпретации. Что касается «санитайзеров» (sanitizers), это довольно детерминированный и надежный подход, но он никогда не будет *идеальным*. Вам нужно, чтобы ваша тестовая программа действительно выполнялась с этим UB, а для достаточно большой программы очень легко внести всевозможный недетерминизм (`HashMap` используют ГПСЧ по умолчанию!).
 >
-> We can never take miri approving of our program's execution as an absolute certain statement there's no UB. It's also possible for miri to *think* something's UB when it really isn't. But if we have a mental model of how things work, and miri seems to agree with us, that's a good sign that we're on the right track.
+> Мы никогда не можем воспринимать одобрение Miri выполнения нашей программы как абсолютное утверждение о том, что там нет UB. Также возможно, что Miri *подумает*, что что-то является UB, когда на самом деле это не так. Но если у нас есть ментальная модель того, как всё работает, и Miri, кажется, согласен с нами, это хороший знак того, что мы на правильном пути.
 
 
+# Базовые заимствования (Basic Borrows)
 
-
-# Basic Borrows
-
-In previous sections we saw that the borrowchecker didn't like this code:
+В предыдущих разделах мы видели, что borrowchecker'у не понравился этот код:
 
 ```rust ,ignore
 let mut data = 10;
 let ref1 = &mut data;
 let ref2 = &mut *ref1;
 
-// ORDER SWAPPED!
+// ПОРЯДОК ИЗМЕНЕН!
 *ref1 += 1;
 *ref2 += 2;
 
 println!("{}", data);
 ```
 
-Let's see what happens when we replace `ref2` with `*mut`:
+Давайте посмотрим, что произойдет, когда мы заменим `ref2` на `*mut`:
 
 ```rust ,ignore
 unsafe {
@@ -46,7 +44,7 @@ unsafe {
     let ref1 = &mut data;
     let ptr2 = ref1 as *mut _;
 
-    // ORDER SWAPPED!
+    // ПОРЯДОК ИЗМЕНЕН!
     *ref1 += 1;
     *ptr2 += 2;
 
@@ -62,7 +60,7 @@ cargo run
 13
 ```
 
-Rustc seems perfectly happy with this: no warnings and the program produced the result we expected! Now let's look at what miri (in strict mode) thinks of it: 
+`rustc`, кажется, вполне доволен этим: никаких предупреждений, и программа выдала ожидаемый нами результат! Теперь давайте посмотрим, что думает об этом Miri (в строгом режиме):
 
 ```text
 MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
@@ -85,9 +83,9 @@ to tag <untagged> at alloc748 found in borrow stack.
  
 ```
 
-Nice! Our intuitive model of how things work held up: although the compiler couldn't catch the issue for us, miri did.
+Отлично! Наша интуитивная модель того, как всё работает, подтвердилась: хотя компилятор не смог поймать проблему за нас, Miri это сделал.
 
-Let's try something more complicated, the `&mut -> *mut -> &mut -> *mut` case we alluded to before:
+Давайте попробуем что-нибудь более сложное, случай `&mut -> *mut -> &mut -> *mut`, на который мы намекали ранее:
 
 ```rust ,ignore
 unsafe {
@@ -97,10 +95,10 @@ unsafe {
     let ref3 = &mut *ptr2;
     let ptr4 = ref3 as *mut _;
 
-    // Access the first raw pointer first
+    // Сначала обращаемся к первому сырому указателю
     *ptr2 += 2;
 
-    // Then access things in "borrow stack" order
+    // Затем обращаемся к вещам в порядке "borrow stack"
     *ptr4 += 4;
     *ref3 += 3;
     *ptr2 += 2;
@@ -127,7 +125,7 @@ to tag <1621> at alloc748 found in borrow stack.
    |
 ```
 
-Wow yep! In strict mode miri can "tell apart" the two raw pointers and have using the second one invalidate the first one. Let's see if everything works when we remove the first use that messes everything up:
+Вау, да! В строгом режиме Miri может «отличить» два сырых указателя и сделать так, чтобы использование второго делало невалидным первый. Давайте посмотрим, работает ли всё, если мы уберем первое использование, которое всё портит:
 
 ```rust ,ignore
 unsafe {
@@ -137,7 +135,7 @@ unsafe {
     let ref3 = &mut *ptr2;
     let ptr4 = ref3 as *mut _;
 
-    // Access things in "borrow stack" order
+    // Обращаемся к вещам в порядке "borrow stack"
     *ptr4 += 4;
     *ref3 += 3;
     *ptr2 += 2;
@@ -155,32 +153,29 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 20
 ```
 
-NICE.
+ОТЛИЧНО.
 
-Yeah I'm pretty sure at this point we can all get PhD's in programming language memory model design and implementation. Who even *needs* compilers, this stuff is *easy*.
+Да, я уверен, что на данный момент мы все можем получить докторскую степень по проектированию и реализации моделей памяти языков программирования. Кому вообще *нужны* компиляторы, эти штуки такие *простые*.
 
-> **NARRATOR:** it was not, but I'm proud of you nonetheless.
-
-
+> **РАССКАЗЧИК (NARRATOR):** это было не так, но я всё равно горжусь вами.
 
 
+# Тестирование массивов (Testing Arrays)
 
-# Testing Arrays
-
-Let's mess with some arrays and pointer offsets (`add` and `sub`). This should work, right?
+Давайте поиграемся с массивами и смещениями указателей (`add` и `sub`). Это должно работать, верно?
 
 ```rust ,ignore
 unsafe {
     let mut data = [0; 10];
-    let ref1_at_0 = &mut data[0];           // Reference to 0th element
-    let ptr2_at_0 = ref1_at_0 as *mut i32;  // Ptr to 0th element
-    let ptr3_at_1 = ptr2_at_0.add(1);       // Ptr to 1st element
+    let ref1_at_0 = &mut data[0];           // Ссылка на 0-й элемент
+    let ptr2_at_0 = ref1_at_0 as *mut i32;  // Указатель на 0-й элемент
+    let ptr3_at_1 = ptr2_at_0.add(1);       // Указатель на 1-й элемент
 
     *ptr3_at_1 += 3;
     *ptr2_at_0 += 2;
     *ref1_at_0 += 1;
 
-    // Should be [3, 3, 0, ...]
+    // Должно быть [3, 3, 0, ...]
     println!("{:?}", &data[..]);
 }
 ```
@@ -200,22 +195,22 @@ to tag <1619> at alloc748+0x4 found in borrow stack.
   |                     at alloc748+0x4 found in borrow stack.
 ```
 
-*Rips up gradschool application*
+*Разрывает заявление в аспирантуру*
 
-What happened? We're using the borrow stack perfectly fine! Does something weird happen when we go `ptr -> ptr`? What if we just copy the pointer so they all go to the same location:
+Что произошло? Мы используем стек заимствований совершенно нормально! Происходит ли что-то странное, когда мы переходим `ptr -> ptr`? Что, если мы просто скопируем указатель, чтобы они все указывали на одно и то же место:
 
 ```rust
 unsafe {
     let mut data = [0; 10];
-    let ref1_at_0 = &mut data[0];           // Reference to 0th element
-    let ptr2_at_0 = ref1_at_0 as *mut i32;  // Ptr to 0th element
-    let ptr3_at_0 = ptr2_at_0;              // Ptr to 0th element
+    let ref1_at_0 = &mut data[0];           // Ссылка на 0-й элемент
+    let ptr2_at_0 = ref1_at_0 as *mut i32;  // Указатель на 0-й элемент
+    let ptr3_at_0 = ptr2_at_0;              // Указатель на 0-й элемент
 
     *ptr3_at_0 += 3;
     *ptr2_at_0 += 2;
     *ref1_at_0 += 1;
 
-    // Should be [6, 0, 0, ...]
+    // Должно быть [6, 0, 0, ...]
     println!("{:?}", &data[..]);
 }
 ```
@@ -228,18 +223,18 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 [6, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
-Nope, that works fine. Maybe we're getting lucky, let's just make a real big mess of pointers:
+Нет, это работает нормально. Может быть, нам везет, давайте просто устроим настоящую кучу-малу из указателей:
 
 ```rust
 unsafe {
     let mut data = [0; 10];
-    let ref1_at_0 = &mut data[0];            // Reference to 0th element
-    let ptr2_at_0 = ref1_at_0 as *mut i32;   // Ptr to 0th element
-    let ptr3_at_0 = ptr2_at_0;               // Ptr to 0th element
-    let ptr4_at_0 = ptr2_at_0.add(0);        // Ptr to 0th element
-    let ptr5_at_0 = ptr3_at_0.add(1).sub(1); // Ptr to 0th element
+    let ref1_at_0 = &mut data[0];            // Ссылка на 0-й элемент
+    let ptr2_at_0 = ref1_at_0 as *mut i32;   // Указатель на 0-й элемент
+    let ptr3_at_0 = ptr2_at_0;               // Указатель на 0-й элемент
+    let ptr4_at_0 = ptr2_at_0.add(0);        // Указатель на 0-й элемент
+    let ptr5_at_0 = ptr3_at_0.add(1).sub(1); // Указатель на 0-й элемент
 
-    // An absolute jumbled hash of ptr usages
+    // Абсолютно беспорядочная смесь использований указателей
     *ptr3_at_0 += 3;
     *ptr2_at_0 += 2;
     *ptr4_at_0 += 4;
@@ -248,7 +243,7 @@ unsafe {
     *ptr2_at_0 += 2;
     *ref1_at_0 += 1;
 
-    // Should be [20, 0, 0, ...]
+    // Должно быть [20, 0, 0, ...]
     println!("{:?}", &data[..]);
 }
 ```
@@ -262,30 +257,30 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 [20, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
-Nope! Miri is actually *way* more permissive when it comes to raw pointers that are derived from other raw pointers. They all share the same "borrow" (or miri calls it, a *tag*).
+Нет! Miri на самом деле *гораздо* более снисходителен, когда дело доходит до сырых указателей, которые получены из других сырых указателей. Все они разделяют одно и то же «заимствование» (или, как называет это Miri, *тег (tag)*).
 
-Once you start using raw pointers they can freely split into their own tiny angry men and mess with themselves. This is ok because the compiler understands that and won't optimize the reads and writes the same it does with references.
+Как только вы начинаете использовать сырые указатели, они могут свободно разделяться на собственных маленьких злых человечков и путаться сами с собой. Это нормально, потому что компилятор понимает это и не будет оптимизировать операции чтения и записи так же, как он делает это со ссылками.
 
-> **NARRATOR:** If the code is simple enough, the compiler can keep track of all the derived pointers and still optimize things where possible, but it's going to be a lot more brittle than the reasoning it can use for references.
+> **РАССКАЗЧИК (NARRATOR):** Если код достаточно простой, компилятор может отслеживать все производные указатели и всё равно оптимизировать вещи, где это возможно, но это будет гораздо более хрупким, чем рассуждения, которые он может использовать для ссылок.
 
-So what's the *real* problem?
+Так в чем же *реальная* проблема?
 
-Even though `data` is one "allocation" (local variable), `ref1_at_0` is only borrowing the first element. Rust allows borrows to be broken up so that they only apply to particular parts of the allocation! Let's try it out:
+Даже если `data` — это одно «выделение» (локальная переменная), `ref1_at_0` заимствует только первый элемент. Rust позволяет разбивать заимствования так, чтобы они применялись только к конкретным частям выделения! Давайте попробуем это сделать:
 
 ```rust ,ignore
 unsafe {
     let mut data = [0; 10];
-    let ref1_at_0 = &mut data[0];           // Reference to 0th element
-    let ref2_at_1 = &mut data[1];           // Reference to 1th element
-    let ptr3_at_0 = ref1_at_0 as *mut i32;  // Ptr to 0th element
-    let ptr4_at_1 = ref2_at_1 as *mut i32;   // Ptr to 1th element
+    let ref1_at_0 = &mut data[0];           // Ссылка на 0-й элемент
+    let ref2_at_1 = &mut data[1];           // Ссылка на 1-й элемент
+    let ptr3_at_0 = ref1_at_0 as *mut i32;  // Указатель на 0-й элемент
+    let ptr4_at_1 = ref2_at_1 as *mut i32;   // Указатель на 1-й элемент
 
     *ptr4_at_1 += 4;
     *ptr3_at_0 += 3;
     *ref2_at_1 += 2;
     *ref1_at_0 += 1;
 
-    // Should be [3, 3, 0, ...]
+    // Должно быть [3, 3, 0, ...]
     println!("{:?}", &data[..]);
 }
 ```
@@ -305,7 +300,7 @@ error[E0499]: cannot borrow `data[_]` as mutable more than once at a time
     to obtain two mutable non-overlapping sub-slices
 ```
 
-Shoot! Rust doesn't track array indices to prove these borrows are disjoint, but it does give us `split_at_mut` to break a slice into multiple parts in a way that is safe to assume works:
+Черт! Rust не отслеживает индексы массива, чтобы доказать, что эти заимствования не пересекаются, но он дает нам `split_at_mut`, чтобы разбить срез на несколько частей таким образом, чтобы это было безопасно предполагать работающим:
 
 ```rust
 unsafe {
@@ -314,17 +309,17 @@ unsafe {
     let slice1 = &mut data[..];
     let (slice2_at_0, slice3_at_1) = slice1.split_at_mut(1); 
     
-    let ref4_at_0 = &mut slice2_at_0[0];    // Reference to 0th element
-    let ref5_at_1 = &mut slice3_at_1[0];    // Reference to 1th element
-    let ptr6_at_0 = ref4_at_0 as *mut i32;  // Ptr to 0th element
-    let ptr7_at_1 = ref5_at_1 as *mut i32;  // Ptr to 1th element
+    let ref4_at_0 = &mut slice2_at_0[0];    // Ссылка на 0-й элемент
+    let ref5_at_1 = &mut slice3_at_1[0];    // Ссылка на 1-й элемент
+    let ptr6_at_0 = ref4_at_0 as *mut i32;  // Указатель на 0-й элемент
+    let ptr7_at_1 = ref5_at_1 as *mut i32;  // Указатель на 1-й элемент
 
     *ptr7_at_1 += 7;
     *ptr6_at_0 += 6;
     *ref5_at_1 += 5;
     *ref4_at_0 += 4;
 
-    // Should be [10, 12, 0, ...]
+    // Должно быть [10, 12, 0, ...]
     println!("{:?}", &data[..]);
 }
 ```
@@ -337,43 +332,43 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 [10, 12, 0, 0, 0, 0, 0, 0, 0, 0]
 ```
 
-Hey, that works! Slices properly tell the compiler and miri "hey I'm taking a huge loan on all of the memory in my range", so they know all of the elements can be mutated.
+Эй, это работает! Срезы правильно сообщают компилятору и Miri: «эй, я беру огромный кредит на всю память в моем диапазоне», поэтому они знают, что все элементы могут быть изменены.
 
-Also note that operations like `split_at_mut` being allowed tells us that borrows can be less of a *stack* and more of a *tree*, because we can break one big borrow into a bunch of disjoint smaller ones, and everything still works.
+Также обратите внимание, что разрешение на такие операции, как `split_at_mut`, говорит нам о том, что заимствования могут быть меньше похожи на *стек* и больше на *дерево*, потому что мы можем разбить одно большое заимствование на кучу непересекающихся меньших, и всё всё равно будет работать.
 
-(I think in the actual stacked borrows model everything's still stacks because the stacks are conceptually tracking permissions for each byte of the program..?)
+(Я думаю, что в реальной модели stacked borrows всё по-прежнему является стеками, потому что стеки концептуально отслеживают разрешения для каждого байта программы..?)
 
-What if we *directly* turn a slice into a pointer? Will that pointer have access to the full slice?
+Что, если мы *напрямую* превратим срез в указатель? Будет ли этот указатель иметь доступ ко всему срезу?
 
 ```rust
 unsafe {
     let mut data = [0; 10];
 
-    let slice1_all = &mut data[..];         // Slice for the entire array
-    let ptr2_all = slice1_all.as_mut_ptr(); // Pointer for the entire array
+    let slice1_all = &mut data[..];         // Срез для всего массива
+    let ptr2_all = slice1_all.as_mut_ptr(); // Указатель для всего массива
     
-    let ptr3_at_0 = ptr2_all;               // Pointer to 0th elem (the same)
-    let ptr4_at_1 = ptr2_all.add(1);        // Pointer to 1th elem
-    let ref5_at_0 = &mut *ptr3_at_0;        // Reference to 0th elem
-    let ref6_at_1 = &mut *ptr4_at_1;        // Reference to 1th elem
+    let ptr3_at_0 = ptr2_all;               // Указатель на 0-й элемент (тот же самый)
+    let ptr4_at_1 = ptr2_all.add(1);        // Указатель на 1-й элемент
+    let ref5_at_0 = &mut *ptr3_at_0;        // Ссылка на 0-й элемент
+    let ref6_at_1 = &mut *ptr4_at_1;        // Ссылка на 1-й элемент
 
     *ref6_at_1 += 6;
     *ref5_at_0 += 5;
     *ptr4_at_1 += 4;
     *ptr3_at_0 += 3;
 
-    // Just for fun, modify all the elements in a loop
-    // (Could use any of the raw pointers for this, they share a borrow!)
+    // Просто ради забавы, изменим все элементы в цикле
+    // (Для этого можно использовать любой из сырых указателей, они разделяют заимствование!)
     for idx in 0..10 {
         *ptr2_all.add(idx) += idx;
     }
 
-    // Safe version of this same code for fun
-    for (idx, elem_ref) in slice1_all.iter_mut().enumerate() {
-        *elem_ref += idx; 
+    // Безопасная версия этого же кода ради забавы
+    for (idx, element_ref) in slice1_all.iter_mut().enumerate() {
+        *element_ref += idx; 
     }
 
-    // Should be [8, 12, 4, 6, 8, 10, 12, 14, 16, 18]
+    // Должно быть [8, 12, 4, 6, 8, 10, 12, 14, 16, 18]
     println!("{:?}", &data[..]);
 }
 ```
@@ -388,19 +383,16 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 ```
 
 
-Nice! Pointers aren't just integers: they have a range of memory associated with them, and with Rust we're allowed to narrow that range!
+Отлично! Указатели — это не просто целые числа: с ними связан диапазон памяти, и в Rust нам разрешено сужать этот диапазон!
 
 
+# Тестирование разделяемых ссылок (Testing Shared References)
 
+Во всех этих примерах я очень осторожно использовал только изменяемые ссылки и выполнял операции чтения-модификации-записи (`+=`), чтобы всё было как можно проще.
 
+Но в Rust есть разделяемые ссылки, которые доступны только для чтения и могут свободно копироваться. Как они должны работать? Ну, мы видели, что сырые указатели могут свободно копироваться, и мы можем справиться с этим, сказав, что они «разделяют» одно заимствование. Может быть, мы думаем о разделяемых ссылках так же?
 
-# Testing Shared References
-
-In all of these examples I have been very carefully only using mutable references and doing read-modify-write operations (`+=`) to keep things as simple as possible.
-
-But Rust has shared references that are read-only and can be freely copied, how should those work? Well we've seen that raw pointers can be freely copied and we can handle that by saying they "share" a single borrow. Maybe we think of shared references the same way?
-
-Let's test that out with a function that reads a value (`println!` can be a little magical with auto-ref/deref stuff, so I'm wrapping it in a function to make sure we're testing what we want to be):
+Давайте протестируем это с помощью функции, которая читает значение (`println!` может быть немного магическим с авто-ссылками/разыменованиями, поэтому я оборачиваю его в функцию, чтобы убедиться, что мы тестируем то, что хотим):
 
 ```rust ,ignore
 fn opaque_read(val: &i32) {
@@ -414,7 +406,7 @@ unsafe {
     let sref3 = sref2;
     let sref4 = &*sref2;
 
-    // Random hash of shared reference reads
+    // Случайный набор чтений разделяемых ссылок
     opaque_read(sref3);
     opaque_read(sref2);
     opaque_read(sref4);
@@ -448,7 +440,7 @@ warning: `miri-sandbox` (bin "miri-sandbox") generated 1 warning
 11
 ```
 
-Oh yeah we forgot to do anything with raw pointers, but at least we can see that it's fine for all the shared references to be used interchangeably. Now let's mix in some raw pointers:
+О да, мы забыли сделать что-либо с сырыми указателями, но, по крайней мере, мы видим, что разделяемые ссылки можно использовать взаимозаменяемо. Теперь давайте подмешаем немного сырых указателей:
 
 ```rust ,ignore
 fn opaque_read(val: &i32) {
@@ -481,7 +473,7 @@ error[E0606]: casting `&&mut i32` as `*mut i32` is invalid
    |                ^^^^^^^^^^^^^^^^^
 ```
 
-Oh whoops, we were actually messing around with `& &mut` instead of `&`! Rust is very good at papering over that when it doesn't matter. Let's properly reborrow it with `let sref3 = &*mref1`:
+Ой, мы на самом деле путались с `& &mut` вместо `&`! Rust очень хорош в том, чтобы заглаживать это, когда это не имеет значения. Давайте правильно перезаимствуем его с помощью `let sref3 = &*mref1`:
 
 
 ```text
@@ -494,7 +486,7 @@ error[E0606]: casting `&i32` as `*mut i32` is invalid
    |                ^^^^^^^^^^^^^^^^^
 ```
 
-Nope, Rust still doesn't like that! You can only cast a shared reference to a `*const` which can only read. But what if we just... do... this...?
+Нет, Rust всё еще это не нравится! Вы можете привести разделяемую ссылку только к `*const`, который может только читать. Но что, если мы просто... сделаем... это...?
 
 ```rust ,ignore
     let ptr4 = sref3 as *const i32 as *mut i32;
@@ -507,7 +499,7 @@ cargo run
 17
 ```
 
-WHAT. OK SURE FINE? Great cast system there Rust. It's almost like the `*const` is a pretty useless type that only really exists to describe C APIs and to vaguely suggest correct usage (it is, it does). What does miri think?
+ЧТО. ОКЕЙ, ЛАДНО, ХОРОШО? Отличная система приведения типов, Rust. Это почти как если бы `*const` был довольно бесполезным типом, который существует только для описания C API и для смутного намека на правильное использование (так и есть). Что думает Miri?
 
 ```text
 MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
@@ -521,13 +513,13 @@ tag <1621> at alloc742 found in borrow stack.
    |                at alloc742 found in borrow stack.
 ```
 
-Alas, though we can get around the compiler complaining with a double cast, it doesn't actually make this operation *allowed*. When we take the shared reference, we're promising not to modify the value. 
+Увы, хотя мы и можем обойти недовольство компилятора с помощью двойного приведения, это на самом деле не делает эту операцию *разрешенной*. Когда мы берем разделяемую ссылку, мы обещаем не изменять значение.
 
-This is important because that means when the shared borrow is popped off the borrow stack, the mutable pointers below it *can* assume the memory hasn't changed. There may have been some tiny angry men *reading* the memory (so writes had to be comitted) but they weren't able to modify it and the mutable pointers can assume the last value they wrote is still there!
+Это важно, потому что это означает, что когда разделяемое заимствование выталкивается из стека заимствований, изменяемые указатели ниже него *могут* предполагать, что память не изменилась. Там могли быть маленькие злые человечки, *читающие* память (поэтому записи должны были быть зафиксированы), но они не могли ее изменить, и изменяемые указатели могут предполагать, что последнее записанное ими значение всё еще там!
 
-**Once a shared reference is on the borrow-stack, everything that gets pushed on top of it only has read permissions.**
+**Как только разделяемая ссылка оказывается в стеке заимствований, всё, что проталкивается поверх нее, имеет только разрешения на чтение.**
 
-We can however do this:
+Однако мы можем сделать следующее:
 
 ```rust
 fn opaque_read(val: &i32) {
@@ -550,7 +542,7 @@ unsafe {
 }
 ```
 
-Note how it was still "fine" to create a mutable raw pointer as long as we only actually read from it!
+Обратите внимание, что всё равно было «нормально» создать изменяемый сырой указатель, пока мы только читали из него!
 
 ```text
 cargo run
@@ -564,7 +556,7 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 13
 ```
 
-And just to be sure, let's check that a shared reference gets popped like normal:
+И просто чтобы быть уверенными, давайте проверим, что разделяемая ссылка выталкивается как обычно:
 
 ```rust ,ignore
 fn opaque_read(val: &i32) {
@@ -578,7 +570,7 @@ unsafe {
     let sref3 = &*mref1;
 
     *ptr2 += 2;
-    opaque_read(sref3); // Read in the wrong order?
+    opaque_read(sref3); // Чтение в неправильном порядке?
     *mref1 += 1;
 
     opaque_read(&data);
@@ -606,17 +598,15 @@ item in the borrow stack
    |
 ```
 
-Hey, we even got a slightly different error message about SharedReadOnly instead of some specific tag. That makes sense: once there's *any* shared references, basically everything else is just a big SharedReadOnly soup so there's no need to distinguish any of them!
+Эй, мы даже получили немного другое сообщение об ошибке о `SharedReadOnly` вместо какого-то конкретного тега. Это имеет смысл: как только появляются *хоть какие-то* разделяемые ссылки, в основном всё остальное — это просто большой суп из `SharedReadOnly`, так что нет необходимости различать их!
 
 
 
+# Тестирование внутренней изменяемости (Testing Interior Mutability)
 
+Помните ту совершенно ужасную главу книги, где мы пытались сделать связанный список с `RefCell` и `Rc`, и всё было еще хуже, чем обычно, при попытке написать эти богом забытые связанные списки?
 
-# Testing Interior Mutability
-
-Remember that really horrible chapter of the book where we tried to make a linked list with RefCell and Rc and everything was even worse than usual when trying to write this godforsaken linked lists?
-
-We've been insisting shared references can't be used for mutation but that chapter was all about how you could actually mutate through shared references with *interior mutability*. Let's try the nice and simple [std::cell::Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html) type:
+Мы настаивали на том, что разделяемые ссылки не могут использоваться для изменения данных, но та глава была посвящена тому, как вы на самом деле можете изменять данные через разделяемые ссылки с помощью *внутренней изменяемости*. Давайте попробуем хороший и простой тип [std::cell::Cell](https://doc.rust-lang.org/std/cell/struct.Cell.html):
 
 ```rust
 use std::cell::Cell;
@@ -635,7 +625,7 @@ unsafe {
 }
 ```
 
-Ah, such a beautiful mess. It will be lovely to see miri spit on it.
+Ах, какой прекрасный беспорядок. Будет здорово увидеть, как Miri плюнет на него.
 
 
 ```text
@@ -646,9 +636,9 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 16
 ```
 
-Wait, really? *That's* fine? Why? How? What even is a *Cell*?
+Погодите, правда? *Это* нормально? Почему? Как? Что вообще такое *Cell*?
 
-*Smashes the padlock on the stdlib*
+*Ломает замок на стандартной библиотеке*
 
 ```rust ,ignore
 pub struct Cell<T: ?Sized> {
@@ -656,9 +646,9 @@ pub struct Cell<T: ?Sized> {
 }
 ```
 
-What the heck is `UnsafeCell`?
+Что за черт этот `UnsafeCell`?
 
-*Smashes another padlock just to really show the stdlib we mean business*
+*Ломает еще один замок, просто чтобы показать стандартной библиотеке, что мы настроены серьезно*
 
 ```rust ,ignore
 #[lang = "unsafe_cell"]
@@ -669,17 +659,17 @@ pub struct UnsafeCell<T: ?Sized> {
 }
 ```
 
-Oh it's wizard magic. Ok. I guess. `#[lang = "unsafe_cell"]` is literally just saying UnsafeCell is UnsafeCell. Let's stop breaking locks and check the actual documentation of [std::cell::UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html).
+О, это магия волшебников. Окей. Я полагаю. `#[lang = "unsafe_cell"]` буквально просто говорит, что `UnsafeCell` — это `UnsafeCell`. Давайте перестанем ломать замки и проверим реальную документацию [std::cell::UnsafeCell](https://doc.rust-lang.org/std/cell/struct.UnsafeCell.html).
 
-> The core primitive for interior mutability in Rust.
+> Ядро-примитив для внутренней изменяемости в Rust.
 >
-> If you have a reference `&T`, then normally in Rust the compiler performs optimizations based on the knowledge that `&T` points to immutable data. Mutating that data, for example through an alias or by transmuting an `&T` into an `&mut T`, is considered undefined behavior. `UnsafeCell<T>` opts-out of the immutability guarantee for `&T`: a shared reference `&UnsafeCell<T>` may point to data that is being mutated. This is called “interior mutability”.
+> Если у вас есть ссылка `&T`, то обычно в Rust компилятор выполняет оптимизации, основанные на знании того, что `&T` указывает на неизменяемые данные. Изменение этих данных, например, через псевдоним (alias) или путем приведения `&T` к `&mut T`, считается неопределенным поведением. `UnsafeCell<T>` отказывается от гарантии неизменяемости для `&T`: разделяемая ссылка `&UnsafeCell<T>` может указывать на данные, которые изменяются. Это называется «внутренней изменяемостью».
 
-Oh it *really is* just wizard magic.
+О, это *действительно* просто магия волшебников.
 
-UnsafeCell basically tells the compiler "hey listen, we're gonna get goofy with this memory, don't make any of the usual aliasing assumptions about it". Like putting up a big "CAUTION: TINY ANGRY MEN CROSSING" sign.
+`UnsafeCell` в основном говорит компилятору: «эй, послушай, мы собираемся подурачиться с этой памятью, не делай никаких обычных предположений об алиасинге в отношении нее». Это как повесить большой знак «ОСТОРОЖНО: ПЕРЕХОД МАЛЕНЬКИХ ЗЛЫХ ЧЕЛОВЕЧКОВ».
 
-Let's see how adding UnsafeCell makes miri happy:
+Давайте посмотрим, как добавление `UnsafeCell` радует Miri:
 
 ```rust ,ignore
 use std::cell::UnsafeCell;
@@ -690,7 +680,7 @@ fn opaque_read(val: &i32) {
 
 unsafe {
     let mut data = UnsafeCell::new(10);
-    let mref1 = data.get_mut();      // Get a mutable ref to the contents
+    let mref1 = data.get_mut();      // Получаем изменяемую ссылку на содержимое
     let ptr2 = mref1 as *mut i32;
     let sref3 = &*ptr2;
 
@@ -724,13 +714,13 @@ item in the borrow stack
 
 ```
 
-Wait, what? We spoke the magic words! What am I going to do with all this federally approved ritual-enhancing goat blood?
+Погодите, что? Мы же произнесли волшебные слова! Что мне теперь делать со всей этой одобренной государством кровью козла для усиления ритуалов?
 
-Well, we did, but then we completely discarded the spell by using `get_mut` which peeks inside the UnsafeCell and makes a proper `&mut i32` to it anyway!
+Ну, мы-то произнесли, но затем полностью разрушили заклинание, использовав `get_mut`, который заглядывает внутрь `UnsafeCell` и всё равно делает из него полноценную `&mut i32`!
 
-Think about it: if the compiler had to assume `&mut i32` *could* be looking inside an `UnsafeCell`, then it would never be able to make any assumptions about aliasing at all! Everything could be full of tiny angry men.
+Подумайте об этом: если бы компилятору приходилось предполагать, что `&mut i32` *может* заглядывать внутрь `UnsafeCell`, то он вообще никогда не смог бы делать никаких предположений об алиасинге! Всё могло бы быть полно маленьких злых человечков.
 
-So what we need to do is keep the `UnsafeCell` in our pointer types so that the compiler understands what we're doing.
+Поэтому нам нужно сохранять `UnsafeCell` в наших типах указателей, чтобы компилятор понимал, что мы делаем.
 
 ```rust
 use std::cell::UnsafeCell;
@@ -741,14 +731,14 @@ fn opaque_read(val: &i32) {
 
 unsafe {
     let mut data = UnsafeCell::new(10);
-    let mref1 = &mut data;              // Mutable ref to the *outside*
-    let ptr2 = mref1.get();             // Get a raw pointer to the insides
-    let sref3 = &*mref1;                // Get a shared ref to the *outside*
+    let mref1 = &mut data;              // Изменяемая ссылка на *внешнюю часть*
+    let ptr2 = mref1.get();             // Получаем сырой указатель на внутренности
+    let sref3 = &*mref1;                // Получаем разделяемую ссылку на *внешнюю часть*
 
-    *ptr2 += 2;                         // Mutate with the raw pointer
-    opaque_read(&*sref3.get());         // Read from the shared ref
-    *sref3.get() += 3;                  // Write through the shared ref
-    *mref1.get() += 1;                  // Mutate with the mutable ref
+    *ptr2 += 2;                         // Изменяем через сырой указатель
+    opaque_read(&*sref3.get());         // Читаем через разделяемую ссылку
+    *sref3.get() += 3;                  // Пишем через разделяемую ссылку
+    *mref1.get() += 1;                  // Изменяем через изменяемую ссылку
 
     println!("{}", *data.get());
 }
@@ -765,18 +755,18 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 16
 ```
 
-It works! I won't have to throw out all this blood after all.
+Это работает! Мне всё-таки не придется выливать всю эту кровь.
 
-Actually, hey wait. We're still being a bit goofy with the order here. We made ptr2 first, and then made sref3 from the mutable pointer. And then we used the raw pointer before the shared pointer. That all seems... wrong.
+Вообще-то, эй, погодите. Мы всё еще немного дурачимся с порядком действий здесь. Мы сначала создали `ptr2`, а затем создали `sref3` из изменяемого указателя. И затем мы использовали сырой указатель перед разделяемым указателем. Всё это кажется... неправильным.
 
-Actually wait we did that with the Cell example too. HMMM.
+Вообще-то, погодите, мы сделали то же самое и в примере с `Cell`. ХММММ.
 
-We're forced to conclude one of two things:
+Мы вынуждены сделать один из двух выводов:
 
-* Miri is imperfect and this is actually still UB.
-* Our simplified model is in fact an oversimplication.
+* Miri несовершенен, и это на самом деле всё еще UB.
+* Наша упрощенная модель на самом деле является сверхупрощением.
 
-I'd put my money on the second one, but just to be safe let's make a version that's definitely airtight in our simplified model of stacked borrows:
+Я бы поставил на второе, но на всякий случай давайте сделаем версию, которая определенно герметична в нашей упрощенной модели stacked borrows:
 
 ```rust
 use std::cell::UnsafeCell;
@@ -788,9 +778,9 @@ fn opaque_read(val: &i32) {
 unsafe {
     let mut data = UnsafeCell::new(10);
     let mref1 = &mut data;
-    // These two are swapped so the borrows are *definitely* totally stacked
+    // Эти двое поменялись местами, чтобы заимствования были *определенно* полностью сложены в стек
     let sref2 = &*mref1;
-    // Derive the ptr from the shared ref to be super safe!
+    // Получаем указатель из разделяемой ссылки, чтобы быть супербезопасными!
     let ptr3 = sref2.get();             
 
     *ptr3 += 3;
@@ -812,26 +802,25 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 16
 ```
 
-Now, one reason why the first implementation we had *might* actually be correct is because if you *really* think about it `&UnsafeCell<T>` really is no different from `*mut T` as far as aliasing is concerned. You can infinitely copy it and mutate through it!
+Итак, одна из причин, почему первая реализация, которую мы сделали, *могла* быть на самом деле правильной, заключается в том, что если вы *действительно* подумаете об этом, `&UnsafeCell<T>` на самом деле ничем не отличается от `*mut T`, когда речь заходит об алиасинге. Вы можете бесконечно копировать его и изменять через него данные!
 
-So in some sense we just created two raw pointers and used them interchangeably like normal. It's *a little* sketchy that both were derived from the mutable reference, so maybe the second one's creation should still pop the first one off the borrow stack, but that's not really necessary since we're not *actually* accessing the contents of the mutable reference, just copying its address.
+Так что в некотором смысле мы просто создали два сырых указателя и использовали их взаимозаменяемо, как обычно. Это *немного* сомнительно, что оба были получены из изменяемой ссылки, так что, возможно, создание второго всё равно должно было вытолкнуть первый из стека заимствований, но это не совсем необходимо, так как мы не *обращаемся* к содержимому изменяемой ссылки, а просто копируем ее адрес.
 
-A line like `let sref2 = &*mref1` is a tricksy thing. *Syntactically* it looks like we're dereferencing it, but dereferencing on it's own isn't actually a *thing*? Consider `&my_tuple.0`: you aren't actually doing anything to `my_tuple` or `.0`, you're just using them to refer to a location in memory and putting `&` in front of it that says "don't load this, just write the address down". 
+Строка вроде `let sref2 = &*mref1` — штука хитрая. *Синтаксически* это выглядит так, будто мы разыменовываем ее, но разыменование само по себе на самом деле не является *действием*? Рассмотрим `&my_tuple.0`: вы на самом деле ничего не делаете с `my_tuple` или `.0`, вы просто используете их для ссылки на место в памяти и ставите перед ними `&`, что говорит: «не загружай это, просто запиши адрес».
 
-`&*` is the same thing: the `*` is just saying "hey let's talk about the location this pointer points to" and the `&` is just saying "now write that address down". Which is of course the same value the original pointer had. But the type of the pointer has changed, because, uh, types!
+`&*` — это то же самое: `*` просто говорит: «эй, давай поговорим о месте, на которое указывает этот указатель», а `&` просто говорит: «а теперь запиши этот адрес». Который, конечно же, является тем же значением, которое было у исходного указателя. Но тип указателя изменился, потому что, ну, типы!
 
-That said, if you do `&**` then you are in fact loading a value with the first `*`! `*` is weird!
+Тем не менее, если вы сделаете `&**`, то вы на самом деле загружаете значение с помощью первого `*`! `*` странный!
 
-> **NARRATOR:** No one cares that you know the word "lvalue", *Jonathan*. In Rust we call them *places*, which is totally different and *so* much cooler?
-
-
+> **РАССКАЗЧИК (NARRATOR):** Никого не волнует, что ты знаешь слово "lvalue", *Джонатан*. В Rust мы называем их *местами (places)*, что совершенно другое и *гораздо* круче?
 
 
-# Testing Box
 
-Hey remember why we started this extremely long aside? You don't? Weird.
+# Тестирование Box (Testing Box)
 
-Well it was because we mixed Box and raw pointers. Box is *kind of* like `&mut`, because it claims unique ownership of the memory it points to. Let's test that claim out:
+Эй, помните, почему мы начали это чрезвычайно длинное отступление? Не помните? Странно.
+
+Ну, это было потому, что мы смешали `Box` и сырые указатели. `Box` — это *как бы* как `&mut`, потому что он претендует на уникальное владение памятью, на которую указывает. Давайте проверим это утверждение:
 
 ```rust ,ignore
 unsafe {
@@ -841,7 +830,7 @@ unsafe {
     *data += 10;
     *ptr1 += 1;
 
-    // Should be 21
+    // Должно быть 21
     println!("{}", data);
 }
 ```
@@ -863,7 +852,7 @@ error: Undefined Behavior: no item granting read access
   |
 ```
 
-Yep, miri hates that. Let's check that doing things in the right order is ok:
+Да, Miri это ненавидит. Давайте проверим, что выполнение действий в правильном порядке — это нормально:
 
 ```rust
 unsafe {
@@ -873,7 +862,7 @@ unsafe {
     *ptr1 += 1;
     *data += 10;
 
-    // Should be 21
+    // Должно быть 21
     println!("{}", data);
 }
 ```
@@ -886,12 +875,12 @@ MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri run
 21
 ```
 
-Yep!
+Да!
 
-Whelp that's all folks, we're finally done talking and thinking about stacked borrows!
+Ну что ж, ребята, на этом всё, мы наконец-то закончили говорить и думать о stacked borrows!
 
-...wait how do we solve this problem with Box? Like, sure we can write toy programs like this but we need to store the Box somewhere and hold onto our raw pointers for a potentially long time. Surely stuff will get mixed up and invalidated?
+...погодите, а как нам решить эту проблему с `Box`? Типа, конечно, мы можем писать игрушечные программы вроде этой, но нам нужно где-то хранить `Box` и удерживать наши сырые указатели в течение потенциально долгого времени. Наверняка вещи перепутаются и станут невалидными?
 
-Great question! To answer that we'll finally be returning to our true calling: writing some god damn linked lists.
+Отличный вопрос! Чтобы ответить на него, мы наконец-то вернемся к нашему истинному призванию: написанию этих чертовых связанных списков.
 
-Wait, I need to write linked lists again? Let's not be hasty folks. Be reasonable. Just hold on I'm sure there's some other interesting issues for me to discu&mdash;
+Подождите, мне опять нужно писать связанные списки? Давайте не будем горячиться, ребята. Будьте благоразумны. Просто подождите, я уверен, что есть еще какие-то интересные темы для обсужде...

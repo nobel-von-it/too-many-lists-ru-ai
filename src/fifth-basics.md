@@ -1,10 +1,10 @@
-# Basics
+# Основы (Basics)
 
-> **NARRATOR:** This section has a looming fundamental error in it, because that's the whole point of the book. However once we start using `unsafe` it's possible to do things wrong and still have everything compile and *seemingly* work. The fundamental mistake will be identified in the next section. Don't actually use the contents of this section in production code!
+> **РАССКАЗЧИК (NARRATOR):** В этом разделе скрыта фундаментальная ошибка, потому что в этом и заключается вся суть книги. Однако, как только мы начинаем использовать `unsafe`, становится возможным делать вещи неправильно, и при этом всё равно всё будет компилироваться и *казаться* работающим. Фундаментальная ошибка будет выявлена в следующем разделе. Не используйте содержимое этого раздела в продакшн-коде!
 
-Alright, back to basics. How do we construct our list?
+Итак, вернемся к основам. Как нам создать наш список?
 
-Before we just did:
+Раньше мы просто делали так:
 
 ```rust ,ignore
 impl<T> List<T> {
@@ -14,7 +14,7 @@ impl<T> List<T> {
 }
 ```
 
-But we're not using Option for the `tail` anymore:
+Но мы больше не используем `Option` для `tail`:
 
 ```text
 > cargo build
@@ -30,13 +30,13 @@ error[E0308]: mismatched types
               found type `std::option::Option<_>`
 ```
 
-We *could* use an Option, but unlike Box, `*mut` *is* nullable. This means it
-can't benefit from the null pointer optimization. Instead, we'll be using `null`
-to represent None.
+Мы *могли бы* использовать `Option`, но, в отличие от `Box`, `*mut` *может* быть нулевым (nullable). Это означает, что он
+не может извлечь выгоду из оптимизации нулевого указателя (null pointer optimization). Вместо этого мы будем использовать `null`
+для представления `None`.
 
-So how do we get a null pointer? There's a few ways, but I prefer to use
-`std::ptr::null_mut()`. If you want, you can also use `0 as *mut _`, but that
-just seems so *messy*.
+Так как же нам получить нулевой указатель? Есть несколько способов, но я предпочитаю использовать
+`std::ptr::null_mut()`. Если хотите, вы также можете использовать `0 as *mut _`, но это
+кажется таким *грязным*.
 
 ```rust ,ignore
 use std::ptr;
@@ -80,24 +80,24 @@ warning: field is never used: `head`
    |     ^^^^^^^^^^^^^
 ```
 
-*shush* compiler, we will use them soon.
+*тсс* компилятор, скоро мы их используем.
 
-Alright, let's move on to writing `push` again. This time, instead of grabbing
-an `Option<&mut Node<T>>` after we insert, we're just going to grab a
-`*mut Node<T>` to the insides of the Box right away. We know we can soundly do
-this because the contents of a Box has a stable address, even if we move the
-Box around. Of course, this isn't *safe*, because if we just drop the Box we'll
-have a pointer to freed memory.
+Хорошо, давайте перейдем к написанию `push` снова. На этот раз вместо того, чтобы брать
+`Option<&mut Node<T>>` после вставки, мы просто сразу возьмем
+`*mut Node<T>` на внутренности `Box`. Мы знаем, что можем это сделать без проблем,
+потому что содержимое `Box` имеет стабильный адрес, даже если мы перемещаем сам
+`Box`. Конечно, это не *безопасно*, потому что если мы просто удалим `Box`, у нас
+останется указатель на освобожденную память.
 
-How do we make a raw pointer from a normal pointer? Coercions! If a variable
-is declared to be a raw pointer, a normal reference will coerce into it:
+Как нам получить сырой указатель из обычного указателя? Приведение типов (Coercions)! Если переменная
+объявлена как сырой указатель, обычная ссылка будет приведена к нему:
 
 ```rust ,ignore
 let raw_tail: *mut _ = &mut *new_tail;
 ```
 
-We have all the info we need. We can translate our code into, approximately,
-the previous reference version:
+У нас есть вся необходимая информация. Мы можем перевести наш код примерно в
+предыдущую версию со ссылками:
 
 ```rust ,ignore
 pub fn push(&mut self, elem: T) {
@@ -108,12 +108,12 @@ pub fn push(&mut self, elem: T) {
 
     let raw_tail: *mut _ = &mut *new_tail;
 
-    // .is_null checks for null, equivalent to checking for None
+    // .is_null проверяет на null, эквивалентно проверке на None
     if !self.tail.is_null() {
-        // If the old tail existed, update it to point to the new tail
+        // Если старый хвост существовал, обновляем его, чтобы он указывал на новый хвост
         self.tail.next = Some(new_tail);
     } else {
-        // Otherwise, update the head to point to it
+        // В противном случае обновляем голову, чтобы она указывала на него
         self.head = Some(new_tail);
     }
 
@@ -134,11 +134,11 @@ error[E0609]: no field `next` on type `*mut fifth::Node<T>`
    |             try dereferencing it: `(*self.tail).next`
 ```
 
-Huh? We have a pointer to a Node, why can't we get the `next` field?
+Что? У нас есть указатель на `Node`, почему мы не можем получить поле `next`?
 
-Rust is kinda a jerk when you use raw pointers. To access the contents of a
-raw pointer, it insists that we manually deref them, because it's such an unsafe
-operation. So let's do that:
+Rust бывает вредным, когда вы используете сырые указатели. Чтобы получить доступ к содержимому
+сырого указателя, он настаивает на том, чтобы мы вручную разыменовывали их, потому что это небезопасная
+операция. Так давайте сделаем это:
 
 ```rust ,ignore
 *self.tail.next = Some(new_tail);
@@ -157,7 +157,7 @@ error[E0609]: no field `next` on type `*mut fifth::Node<T>`
    |             try dereferencing it: `(*self.tail).next`
 ```
 
-Uuuugh operator precedence.
+Уууух, приоритет операторов.
 
 ```rust ,ignore
 (*self.tail).next = Some(new_tail);
@@ -179,15 +179,15 @@ error[E0133]: dereference of raw pointer is unsafe and requires
      all of these are undefined behavior
 ```
 
-THIS. SHOULDN'T. BE. THIS. HARD.
+ЭТО. НЕ ДОЛЖНО. БЫТЬ. ТАК. СЛОЖНО.
 
-Remember how I said Unsafe Rust is like an FFI language for Safe Rust? Well, the
-compiler wants us to explicitly delimit where we're doing this FFI-ing. We have
-two options. First, we can mark our *entire* function as unsafe, in which case
-it becomes an Unsafe Rust function and can only be called in an `unsafe`
-context. This isn't great, because we want our list to be safe to use. Second,
-we can write an `unsafe` block inside our function, to delimit the FFI boundary.
-This declares the overall function to be safe. Let's do that one:
+Помните, я говорил, что Небезопасный Rust подобен языку FFI для Безопасного Rust? Так вот,
+компилятор хочет, чтобы мы явно разграничивали, где мы занимаемся этим самым FFI. У нас есть
+два варианта. Во-первых, мы можем пометить *всю* нашу функцию как `unsafe`, и в этом случае
+она станет функцией Небезопасного Rust и сможет вызываться только в `unsafe`
+контексте. Это не очень хорошо, потому что мы хотим, чтобы наш список был безопасным для использования. Во-вторых,
+мы можем написать блок `unsafe` внутри нашей функции, чтобы разграничить границу FFI.
+Это объявляет функцию в целом безопасной. Давайте выберем этот вариант:
 
 
 ```rust ,ignore
@@ -200,8 +200,8 @@ pub fn push(&mut self, elem: T) {
     let raw_tail: *mut _ = &mut *new_tail;
 
     if !self.tail.is_null() {
-        // Hello Compiler, I Know I Am Doing Something Dangerous And
-        // I Promise To Be A Good Programmer Who Never Makes Mistakes.
+        // Привет, компилятор! Я знаю, что делаю что-то опасное,
+        // и обещаю быть хорошим программистом, который никогда не делает ошибок.
         unsafe {
             (*self.tail).next = Some(new_tail);
         }
@@ -224,53 +224,51 @@ warning: field is never used: `elem`
    = note: #[warn(dead_code)] on by default
 ```
 
-Yay!
+Ура!
 
-It's kind've interesting that that's the *only* place we've had to write an
-unsafe block so far. We do raw pointer stuff all over the place, what's up with
-that?
+Довольно интересно, что это *единственное* место, где нам пришлось написать
+блок `unsafe` до сих пор. Мы делаем кучу вещей с сырыми указателями повсюду, почему так?
 
-It turns out that Rust is a massive rules-lawyer pedant when it comes to
-`unsafe`. We quite reasonably want to maximize the set of Safe Rust programs,
-because those are programs we can be much more confident in. To accomplish this,
-Rust carefully carves out a minimal surface area for unsafety. Note that all
-the other places we've worked with raw pointers has been *assigning* them, or
-just observing whether they're null or not.
+Оказывается, Rust — жуткий педант и буквоед, когда дело доходит до
+`unsafe`. Мы вполне разумно хотим максимизировать набор программ на Безопасном Rust,
+потому что в этих программах мы можем быть гораздо более уверены. Чтобы достичь этого,
+Rust тщательно вырезает минимальную площадь поверхности для небезопасности. Обратите внимание, что во всех
+остальных местах, где мы работали с сырыми указателями, мы либо *присваивали* их, либо
+просто наблюдали, нулевые они или нет.
 
-If you never actually dereference a raw pointer *those are totally safe things
-to do*. You're just reading and writing an integer! The only time you can
-actually get into trouble with a raw pointer is if you actually dereference it.
-So Rust says *only* that operation is unsafe, and everything else is totally
-safe.
+Если вы никогда на самом деле не разыменовываете сырой указатель, *это абсолютно безопасные действия*. Вы просто читаете и пишете целое число! Единственный раз, когда вы
+действительно можете попасть в беду с сырым указателем — это если вы его разыменуете.
+Поэтому Rust говорит, что *только* эта операция является небезопасной, а всё остальное — совершенно
+безопасно.
 
-Super. Pedantic. But technically correct.
+Супер. Педантично. Но технически верно.
 
-> **NARRATOR:** Somewhere on the other side of the world, a hardware engineer
-feels a shiver down her spine &mdash; someone must be insisting pointers
-are just integers again. She looks down at her proposal for a new hardware
-pointer authentication scheme and sheds a single tear. The compiler engineer
-next door feels nothing &mdash; they long ago learned to always wear a heavy
-sweater.
+> **РАССКАЗЧИК (NARRATOR):** Где-то на другом конце света инженер по аппаратному обеспечению
+чувствует дрожь по спине — кто-то, должно быть, снова утверждает, что указатели
+это просто целые числа. Она смотрит на свое предложение по новой аппаратной
+схеме аутентификации указателей и роняет единственную слезу. Инженер по компиляторам
+по соседству ничего не чувствует — он давно научился всегда носить тяжелый
+свитер.
 
-Having only some of the pointer operations be *actually* unsafe raises an
-interesting problem: although we're supposed to delimit the scope of the
-unsafety with the `unsafe` block, it actually depends on state that was
-established outside of the block. Outside of the function, even!
+То, что только некоторые операции с указателями являются *на самом деле* небезопасными, порождает
+интересную проблему: хотя мы должны разграничивать область небезопасности
+блоком `unsafe`, на самом деле она зависит от состояния, которое было
+установлено вне этого блока. Даже вне функции!
 
-This is what I call unsafe *taint*. As soon as you use `unsafe` in a module,
-that whole module is tainted with unsafety. Everything has to be correctly
-written in order to make sure all invariants are upheld for the unsafe code.
+Это то, что я называю «небезопасным загрязнением» (unsafe taint). Как только вы используете `unsafe` в модуле,
+весь этот модуль оказывается загрязнен небезопасностью. Всё должно быть правильно
+написано, чтобы гарантировать соблюдение всех инвариантов для небезопасного кода.
 
-This taint is manageable because of *privacy*. Outside of our module, all of our
-struct fields are totally private, so no one else can mess with our state in
-arbitrary ways. As long as no combination of the APIs we expose causes bad stuff
-to happen, as far as an outside observer is concerned, all of our code is safe!
-And really, this is no different from the FFI case. No one needs to care
-if some python math library shells out to C as long as it exposes a safe
-interface.
+Это загрязнение вполне управляемо благодаря *приватности* (privacy). За пределами нашего модуля все поля наших
+структур полностью приватны, поэтому никто другой не может вмешиваться в наше состояние
+произвольным образом. До тех пор, пока никакая комбинация предоставляемых нами API не приводит к плохим вещам,
+с точки зрения внешнего наблюдателя весь наш код безопасен!
+И на самом деле это ничем не отличается от случая с FFI. Никому не нужно заботиться о том,
+обращается ли какая-то математическая библиотека Python к Си, пока она предоставляет безопасный
+интерфейс.
 
-Anyway, let's move on to `pop`, which is pretty much verbatim the reference
-version:
+В общем, давайте перейдем к `pop`, который практически дословно повторяет версию со
+ссылками:
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<T> {
@@ -287,11 +285,11 @@ pub fn pop(&mut self) -> Option<T> {
 }
 ```
 
-Again we see another case where safety is stateful. If we fail to null out the
-tail pointer in *this* function, we'll see no problems at all. However
-subsequent calls to `push` will start writing to the dangling tail!
+И снова мы видим случай, когда безопасность зависит от состояния. Если мы забудем обнулить
+указатель на хвост в *этой* функции, мы вообще не увидим никаких проблем. Однако
+последующие вызовы `push` начнут писать в висячий хвост!
 
-Let's test it out:
+Давайте протестируем это:
 
 ```rust ,ignore
 #[cfg(test)]
@@ -301,35 +299,35 @@ mod test {
     fn basics() {
         let mut list = List::new();
 
-        // Check empty list behaves right
+        // Проверяем, что пустой список ведет себя правильно
         assert_eq!(list.pop(), None);
 
-        // Populate list
+        // Заполняем список
         list.push(1);
         list.push(2);
         list.push(3);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop(), Some(1));
         assert_eq!(list.pop(), Some(2));
 
-        // Push some more just to make sure nothing's corrupted
+        // Добавляем еще немного, чтобы убедиться, что ничего не испортилось
         list.push(4);
         list.push(5);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop(), Some(3));
         assert_eq!(list.pop(), Some(4));
 
-        // Check exhaustion
+        // Проверяем исчерпание списка
         assert_eq!(list.pop(), Some(5));
         assert_eq!(list.pop(), None);
 
-        // Check the exhaustion case fixed the pointer right
+        // Проверяем, что случай исчерпания правильно исправил указатель
         list.push(6);
         list.push(7);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop(), Some(6));
         assert_eq!(list.pop(), Some(7));
         assert_eq!(list.pop(), None);
@@ -337,9 +335,8 @@ mod test {
 }
 ```
 
-This is just the stack test, but with the expected `pop` results flipped around.
-I also added some extra steps at the end to make sure that tail-pointer
-corruption case in `pop` doesn't occur.
+Это просто тест для стека, но с перевернутыми ожидаемыми результатами `pop`.
+Я также добавил несколько дополнительных шагов в конце, чтобы убедиться, что порча указателя на хвост в `pop` не происходит.
 
 ```text
 cargo test
@@ -361,6 +358,6 @@ test third::test::iter ... ok
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured
 ```
 
-Gold Star!
+Золотая звезда!
 
-> **NARRATOR:** Here it comes...
+> **РАССКАЗЧИК (NARRATOR):** Вот оно...

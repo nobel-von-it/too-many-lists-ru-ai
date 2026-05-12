@@ -1,25 +1,25 @@
-# Layout and Basics 2: Getting Raw
+# Структура и основы 2: Становимся «сырыми» (Getting Raw)
 
-> TL;DR on the previous three sections: randomly mixing safe pointers like `&`, `&mut`, and `Box` with unsafe pointers like `*mut` and `*const` is a recipe for Undefined Behaviour because the safe pointers introduce extra constraints that we aren't obeying with the raw pointers.
+> Краткое содержание (TL;DR) предыдущих трех разделов: случайное смешивание безопасных указателей вроде `&`, `&mut` и `Box` с небезопасными указателями вроде `*mut` и `*const` — это рецепт для Неопределенного Поведения, потому что безопасные указатели вводят дополнительные ограничения, которые мы не соблюдаем при работе с сырыми указателями.
 
-Oh god I need to write linked lists again. Fine. FINE. It's Fine. We're fine.
+О боже, мне опять нужно писать связанные списки. Ладно. ЛАДНО. Всё нормально. Мы в порядке.
 
-We're gonna knock a lot of this section out real quick since we already discussed the design in the first try around, and everything we did *was* basically correct except for how we mixed together safe and unsafe pointers.
+Мы собираемся быстро разобраться с этим разделом, так как мы уже обсуждали дизайн в первой попытке, и всё, что мы делали, *было* в основном правильным, за исключением того, как мы смешивали безопасные и небезопасные указатели.
 
 
-# Layout
+# Структура (Layout)
 
-So in the new layout we're only going to only use raw pointers and everything will be perfect and we'll never make mistakes again.
+Итак, в новой структуре мы будем использовать только сырые указатели, и всё будет идеально, и мы больше никогда не совершим ошибок.
 
-Here's our old broken layout:
+Вот наша старая сломанная структура:
 
 ```rust
 pub struct List<T> {
     head: Link<T>,
-    tail: *mut Node<T>, // INNOCENT AND KIND
+    tail: *mut Node<T>, // НЕВИНЕН И ДОБР
 }
 
-type Link<T> = Option<Box<Node<T>>>; // THE REAL EVIL
+type Link<T> = Option<Box<Node<T>>>; // НАСТОЯЩЕЕ ЗЛО
 
 struct Node<T> {
     elem: T,
@@ -27,7 +27,7 @@ struct Node<T> {
 }
 ```
 
-And here's our new layout:
+А вот наша новая структура:
 
 ```rust
 pub struct List<T> {
@@ -35,7 +35,7 @@ pub struct List<T> {
     tail: *mut Node<T>,
 }
 
-type Link<T> = *mut Node<T>; // MUCH BETTER
+type Link<T> = *mut Node<T>; // ГОРАЗДО ЛУЧШЕ
 
 struct Node<T> {
     elem: T,
@@ -43,13 +43,13 @@ struct Node<T> {
 }
 ```
 
-Remember: Option isn't as nice or useful when we're using raw pointers, so we're not using that anymore. In later sections we'll look at the `NonNull` type, but don't worry about that for now.
+Помните: `Option` не так хорош или полезен, когда мы используем сырые указатели, поэтому мы больше его не используем. В следующих разделах мы рассмотрим тип `NonNull`, но пока не беспокойтесь об этом.
 
 
 
-# Basics
+# Основы (Basics)
 
-List::new is basically the same.
+`List::new` остался практически таким же.
 
 ```rust ,ignore
 use ptr;
@@ -61,7 +61,7 @@ impl<T> List<T> {
 }
 ```
 
-Push is basically the s-
+`push` тоже практически та же с...
 
 
 ```rust ,ignore
@@ -69,13 +69,13 @@ pub fn push(&mut self, elem: T) {
     let mut new_tail = Box::new(
 ```
 
-Wait we're not using Box anymore. How do we allocate memory without Box?
+Подождите, мы ведь больше не используем `Box`. Как нам выделить память без `Box`?
 
-Well, we *could* with `std::alloc::alloc`, but that's like bringing a katana into the kitchen. It'll get the job done but it's kinda overkill and unwieldy.
+Ну, мы *могли бы* сделать это с помощью `std::alloc::alloc`, но это как принести катану на кухню. Работа будет сделана, но это как-то чересчур и неудобно.
 
-We want to *have* boxes, but, *not*. One completely wild but *maybe* viable option would be to do something like this:
+Мы хотим *иметь* боксы, но *нет*. Одним из совершенно диких, но, *возможно*, жизнеспособных вариантов было бы сделать что-то вроде этого:
 
-```
+```rust
 struct Node<T> {
     elem: T,
     real_next: Option<Box<Node<T>>>,
@@ -83,45 +83,45 @@ struct Node<T> {
 }
 ```
 
-With the idea that we create the Boxes and store them in our node, but then we take a raw pointer into them and only use that raw pointer until we're done with the Node and want to destroy it. Then we can `take` the Box out of `real_next` and drop it. I *think* that would conform to our very simplified stacked borrows model? 
+Идея в том, что мы создаем `Box`'ы и сохраняем их в нашем узле, но затем мы берем сырой указатель на них и используем только этот сырой указатель до тех пор, пока не закончим с узлом и не захотим его уничтожить. Затем мы можем забрать (`take`) `Box` из `real_next` и дропнуть его. Я *думаю*, это соответствовало бы нашей сильно упрощенной модели stacked borrows?
 
-If you wanna try to make that, have "fun", but that just looks awful right? This isn't the chapter on Rc and RefCell, we're not gonna play this *game* anymore. We're gonna just make simple and clean stuff.
+Если вы хотите попробовать сделать такое, «развлекайтесь», но выглядит это просто ужасно, верно? Это не глава про `Rc` и `RefCell`, мы больше не будем играть в эти *игры*. Мы собираемся делать простые и чистые вещи.
 
-So instead we're going to use the very nice [Box::into_raw][] function:
+Поэтому вместо этого мы собираемся использовать очень хорошую функцию [Box::into_raw][]:
 
 > ```rust ,ignore
 >   pub fn into_raw(b: Box<T>) -> *mut T
 > ```
 >
-> Consumes the Box, returning a wrapped raw pointer.
+> Потребляет `Box`, возвращая обернутый сырой указатель.
 >
-> The pointer will be properly aligned and non-null.
+> Указатель будет правильно выровнен и не будет нулевым.
 >
->After calling this function, the caller is responsible for the memory previously managed by the Box. In particular, the caller should properly destroy T and release the memory, taking into account the memory layout used by Box. The easiest way to do this is to convert the raw pointer back into a Box with the `Box::from_raw` function, allowing the Box destructor to perform the cleanup.
+> После вызова этой функции вызывающий несет ответственность за память, которой ранее управлял `Box`. В частности, вызывающий должен правильно уничтожить `T` и освободить память, принимая во внимание структуру памяти, используемую `Box`. Самый простой способ сделать это — преобразовать сырой указатель обратно в `Box` с помощью функции `Box::from_raw`, что позволит деструктору `Box` выполнить очистку.
 >
-> Note: this is an associated function, which means that you have to call it as `Box::into_raw(b)` instead of `b.into_raw()`. This is so that there is no conflict with a method on the inner type.
+> Примечание: это ассоциированная функция, что означает, что вы должны вызывать ее как `Box::into_raw(b)`, а не `b.into_raw()`. Это сделано для того, чтобы не было конфликта с методами внутреннего типа.
 >
-> **Examples**
+> **Примеры**
 >
-> Converting the raw pointer back into a Box with Box::from_raw for automatic cleanup:
+> Преобразование сырого указателя обратно в `Box` с помощью `Box::from_raw` для автоматической очистки:
 >
-> ```
+> ```rust
 >  let x = Box::new(String::from("Hello"));
 >  let ptr = Box::into_raw(x);
 >  let x = unsafe { Box::from_raw(ptr) };
 > ```
 
-Nice, that looks *literally* designed for our use case. It also matches the rules we're trying to follow: start with safe stuff, turn into into raw pointers, and then only convert back to safe stuff at the end (when we want to Drop it).
+Отлично, это выглядит *буквально* созданным для нашего случая использования. Это также соответствует правилам, которым мы пытаемся следовать: начинаем с безопасных вещей, превращаем их в сырые указатели, а затем конвертируем обратно в безопасные вещи только в самом конце (когда мы хотим дропнуть узел).
 
-This is basically exactly like doing the weird `real_next` thing but without having to faff around storing the Box when it's the exact same pointer as the raw pointer anyway.
+Это в основном то же самое, что делать странную штуку с `real_next`, но без необходимости возиться с хранением `Box`, когда он в любом случае является точно таким же указателем, как и сырой указатель.
 
-Also now that we're just using raw pointers everywhere, let's not worry about keeping those `unsafe` blocks narrow: it's all unsafe now. (It always was, but it's nice to lie to yourself sometimes.)
+Кроме того, теперь, когда мы просто используем сырые указатели повсюду, давайте не будем беспокоиться о том, чтобы делать блоки `unsafe` узкими: теперь всё небезопасно. (Так было всегда, но иногда приятно себе соврать.)
 
 
 ```rust ,ignore
 pub fn push(&mut self, elem: T) {
     unsafe {
-        // Immediately convert the Box into a raw pointer
+        // Немедленно преобразуем Box в сырой указатель
         let new_tail = Box::into_raw(Box::new(Node {
             elem: elem,
             next: ptr::null_mut(),
@@ -139,9 +139,9 @@ pub fn push(&mut self, elem: T) {
 ```
 
 
-Hey that code's actually looking a lot cleaner now that we're sticking to raw pointers!
+Эй, а код-то на самом деле выглядит намного чище теперь, когда мы придерживаемся сырых указателей!
 
-On to pop, which is also pretty similar to how we left it, although we've got to remember to use `Box::from_raw` to clean up the allocation:
+Перейдем к `pop`, который также очень похож на то, на чем мы остановились, хотя мы должны помнить об использовании `Box::from_raw` для очистки выделенной памяти:
 
 ```rust ,ignore
 pub fn pop(&mut self) -> Option<T> {
@@ -149,7 +149,7 @@ pub fn pop(&mut self) -> Option<T> {
         if self.head.is_null() {
             None
         } else {
-            // RISE FROM THE GRAVE
+            // ВОССТАНЬ ИЗ МОГИЛЫ
             let head = Box::from_raw(self.head);
             self.head = head.next;
 
@@ -163,9 +163,9 @@ pub fn pop(&mut self) -> Option<T> {
 }
 ```
 
-Our nice little `take`s and `map`s are dead, gotta just check and set `null` manually now.
+Наши милые маленькие `take` и `map` мертвы, теперь приходится просто проверять и устанавливать `null` вручную.
 
-And while we're here, let's slap in the destructor. This time we'll implement it as just repeatedly popping, because it's cute and simple:
+И пока мы здесь, давайте добавим деструктор. На этот раз мы реализуем его как простое повторение `pop`, потому что это мило и просто:
 
 ```rust ,ignore
 impl<T> Drop for List<T> {
@@ -176,7 +176,7 @@ impl<T> Drop for List<T> {
 ```
 
 
-Now, for the moment of truth:
+А теперь момент истины:
 
 ```rust ,ignore
 #[cfg(test)]
@@ -186,35 +186,35 @@ mod test {
     fn basics() {
         let mut list = List::new();
 
-        // Check empty list behaves right
+        // Проверяем, что пустой список ведет себя правильно
         assert_eq!(list.pop(), None);
 
-        // Populate list
+        // Заполняем список
         list.push(1);
         list.push(2);
         list.push(3);
 
-        // Check normal removal
+        // Проверяем обычное удаление
         assert_eq!(list.pop(), Some(1));
         assert_eq!(list.pop(), Some(2));
 
-        // Push some more just to make sure nothing's corrupted
+        // Добавляем еще немного, просто чтобы убедиться, что ничего не испорчено
         list.push(4);
         list.push(5);
 
-        // Check normal removal
+        // Проверяем обычное удаление
         assert_eq!(list.pop(), Some(3));
         assert_eq!(list.pop(), Some(4));
 
-        // Check exhaustion
+        // Проверяем исчерпание
         assert_eq!(list.pop(), Some(5));
         assert_eq!(list.pop(), None);
 
-        // Check the exhaustion case fixed the pointer right
+        // Проверяем, что случай исчерпания правильно исправил указатель
         list.push(6);
         list.push(7);
 
-        // Check normal removal
+        // Проверяем обычное удаление
         assert_eq!(list.pop(), Some(6));
         assert_eq!(list.pop(), Some(7));
         assert_eq!(list.pop(), None);
@@ -242,7 +242,7 @@ test third::test::iter ... ok
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured
 ```
 
-Good, but does miri agree?
+Хорошо, но согласен ли с этим Miri?
 
 ```text
 MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri test
@@ -264,13 +264,13 @@ test third::test::iter ... ok
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured
 ```
 
-EYYYY!!!!!
+ЭЭЭЙЙЙЙ!!!!!
 
-IT FRIGGIN WORKED!
+ОНО, ЧЕРТ ВОЗЬМИ, СРАБОТАЛО!
 
-PROBABLY!
+ВЕРОЯТНО!
 
-FAILING TO FIND UNDEFINED BEHAVIOUR IS NOT A PROOF THAT IT ISN'T THERE WAITING TO CAUSE PROBLEMS BUT THERE IS A LIMIT TO HOW RIGOROUS I AM WILLING TO BE FOR A JOKE BOOK ABOUT LINKED LISTS SO WE'RE GONNA CALL THIS A 100% MACHINE VERIFIED PROOF AND ANYONE WHO SAYS OTHERWISE CAN SUCK MY COQ!
+НЕВОЗМОЖНОСТЬ НАЙТИ НЕОПРЕДЕЛЕННОЕ ПОВЕДЕНИЕ НЕ ЯВЛЯЕТСЯ ДОКАЗАТЕЛЬСТВОМ ТОГО, ЧТО ЕГО ТАМ НЕТ И ОНО НЕ ЖДЕТ СВОЕГО ЧАСА, ЧТОБЫ ВЫЗВАТЬ ПРОБЛЕМЫ, НО ЕСТЬ ПРЕДЕЛ ТОМУ, НАСКОЛЬКО СТРОГИМ Я ГОТОВ БЫТЬ ДЛЯ ШУТОЧНОЙ КНИГИ О СВЯЗАННЫХ СПИСКАХ, ТАК ЧТО МЫ БУДЕМ НАЗЫВАТЬ ЭТО НА 100% МАШИННО ПРОВЕРЕННЫМ ДОКАЗАТЕЛЬСТВОМ, А ВСЕ, КТО ГОВОРИТ ИНАЧЕ, МОГУТ ПОСОСАТЬ МОЙ COQ!
 
 ∴ QED □
 

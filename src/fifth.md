@@ -1,23 +1,23 @@
-# An Ok Unsafe Singly-Linked Queue
+# Нормальная небезопасная односвязная очередь (An Ok Unsafe Singly-Linked Queue)
 
-Ok that reference-counted interior mutability stuff got a little out of
-control. Surely Rust doesn't really expect you to do that sort of thing
-in general? Well, yes and no. Rc and Refcell can be great for handling
-simple cases, but they can get unwieldy. Especially if you
-want to hide that it's happening. There's gotta be a better way!
+Ладно, эти штуки с подсчетом ссылок и внутренней изменяемостью немного вышли из-под
+контроля. Неужели Rust действительно ожидает, что вы будете делать подобные вещи
+в общем случае? Ну, и да, и нет. `Rc` и `RefCell` могут отлично подходить для обработки
+простых случаев, но они могут стать громоздкими. Особенно если вы
+хотите скрыть происходящее. Должен быть лучший способ!
 
-In this chapter we're going to roll back to singly-linked lists and
-implement a singly-linked queue to dip our toes into *raw pointers*
-and *Unsafe Rust*.
+В этой главе мы вернемся назад к односвязным спискам и
+реализуем односвязную очередь, чтобы окунуться в мир *сырых указателей (raw pointers)*
+и *небезопасного Rust (Unsafe Rust)*.
 
-> **NARRATOR:** And I will point out the mistakes.
+> **РАССКАЗЧИК (NARRATOR):** А я буду указывать на ошибки.
 
-And we won't make *any* mistakes.
+И мы не сделаем *ни одной* ошибки.
 
-Let's add a new file called `fifth.rs`:
+Давайте добавим новый файл с именем `fifth.rs`:
 
 ```rust ,ignore
-// in lib.rs
+// в lib.rs
 
 pub mod first;
 pub mod second;
@@ -26,7 +26,7 @@ pub mod fourth;
 pub mod fifth;
 ```
 
-Our code is largely going to be derived from second.rs, since a queue is
-mostly an augmentation of a stack in the world of linked lists. Still, we're
-going to go from scratch because there's some fundamental issues we want to
-address with layout and what-not.
+Наш код в значительной степени будет производным от `second.rs`, так как очередь — это
+в основном расширение стека в мире связанных списков. Тем не менее, мы собираемся
+начать с чистого листа, потому что есть некоторые фундаментальные проблемы со структурой
+и прочим, которые мы хотим решить.

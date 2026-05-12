@@ -1,11 +1,11 @@
-# Extra Junk
+# Всякий лишний хлам (Extra Junk)
 
-Now that `push` and `pop` are written, everything else is acutally exactly the same as the stack case, weirdly. Only operations that change the length of the list need to touch the tail pointer.
+Теперь, когда `push` и `pop` написаны, всё остальное на самом деле точно такое же, как и в случае со стеком, как ни странно. Только операции, которые изменяют длину списка, должны затрагивать указатель на хвост (`tail`).
 
-But of course, now that everything's unsafe pointers we need to rewrite the code to use those! And if we're going to be touching all the code, we might as well
-take the chance to make sure we aren't missing something.
+Но, конечно, теперь, когда всё стало небезопасными указателями, нам нужно переписать код для их использования! И раз уж мы собираемся трогать весь код, мы могли бы заодно
+воспользоваться шансом и убедиться, что ничего не упустили.
 
-But anyway, let's start copy-pasting code from the stack implementation:
+Но в любом случае, давайте начнем копипастить код из реализации стека:
 
 ```rust ,ignore
 // ...
@@ -21,7 +21,7 @@ pub struct IterMut<'a, T> {
 }
 ```
 
-IntoIter looks fine, but `Iter` and `IterMut` are breaking our simple rule of never using safe pointers in our types anymore. Let's be safe and change those to use raw pointers:
+`IntoIter` выглядит нормально, но `Iter` и `IterMut` нарушают наше простое правило никогда больше не использовать безопасные указатели в наших типах. Давайте перестрахуемся и изменим их для использования сырых указателей:
 
 ```rust ,ignore
 pub struct IntoIter<T>(List<T>);
@@ -49,7 +49,7 @@ impl<T> List<T> {
 }
 ```
 
-Looks good!
+Выглядит неплохо!
 
 ```text
 error[E0392]: parameter `'a` is never used
@@ -71,29 +71,29 @@ error[E0392]: parameter `'a` is never used
      or using a marker such as `PhantomData`
 ```
 
-Doesn't look good! What's this [PhantomData](https://doc.rust-lang.org/std/marker/struct.PhantomData.html) they're on about?
+Выглядит не очень! Что это за [PhantomData](https://doc.rust-lang.org/std/marker/struct.PhantomData.html), о которой они толкуют?
 
-> Zero-sized type used to mark things that “act like” they own a `T`.
+> Тип нулевого размера, используемый для маркировки вещей, которые «ведут себя так», как будто они владеют `T`.
 >
-> Adding a `PhantomData<T>` field to your type tells the compiler that your type acts as though it stores a value of type `T`, even though it doesn’t really. This information is used when computing certain safety properties.
+> Добавление поля `PhantomData<T>` в ваш тип сообщает компилятору, что ваш тип ведет себя так, как будто он хранит значение типа `T`, хотя на самом деле это не так. Эта информация используется при вычислении определенных свойств безопасности.
 >
-> For a more in-depth explanation of how to use `PhantomData<T>`, please see [the Nomicon](https://doc.rust-lang.org/nightly/nomicon/).
+> Для более подробного объяснения того, как использовать `PhantomData<T>`, пожалуйста, обратитесь к [Nomicon](https://doc.rust-lang.org/nightly/nomicon/).
 
-Hey don't get hasty there, we're reading the book that *I* wrote. Not that other book that some huge *nerd* probably wrote! I bet if they write a data structure in there it's something lame like an Array Stack and *not* a Linked List.
+Эй, не спешите, мы читаем книгу, которую написал *Я*. А не ту другую книгу, которую наверняка написал какой-то жуткий *задрот (nerd)*! Готов поспорить, если они и пишут там какую-то структуру данных, то это что-то отстойное вроде стека на массиве (Array Stack), а *не* связанный список.
 
-> Unused lifetime parameters
+> Неиспользуемые параметры времени жизни
 >
-> Perhaps the most common use case for PhantomData is a struct that has an unused lifetime parameter, typically as part of some unsafe code.
+> Возможно, наиболее распространенным вариантом использования `PhantomData` является структура, которая имеет неиспользуемый параметр времени жизни, обычно как часть какого-то небезопасного кода.
 
-Ah so we're naming a lifetime in our type but not actually using it. We *could* go down the PhantomData path, but I want to save that for the doubly-linked list in the next chapter that will *really* need it.
+А, так мы объявляем время жизни в нашем типе, но на самом деле его не используем. Мы *могли бы* пойти по пути `PhantomData`, но я хочу приберечь это для двусвязного списка в следующей главе, которому она *действительно* понадобится.
 
-We're in an interesting situation where we actually don't need PhantomData. *I think*. I'm just going to claim that and trust that it's true, and if miri yells at us at the end I'll concede the point and we'll do the PhantomData thing.
+Мы находимся в интересной ситуации, когда нам на самом деле не нужна `PhantomData`. *Мне так кажется*. Я просто заявлю об этом и буду верить, что это правда, а если Miri накричит на нас в конце, я признаю свою неправоту, и мы сделаем штуку с `PhantomData`.
 
-What we're actually going to do is put the references back in these Iterator types and be happy we get to use references in some places still. I think that's sound because there's still a kind of proper nesting when you use an iterator: you create the iterator, use safe references for a while, and then discard the iterator. 
+Что мы на самом деле сделаем, так это вернем ссылки обратно в эти типы итераторов и будем рады, что всё еще можем использовать ссылки в некоторых местах. Я думаю, это обоснованно, потому что при использовании итератора всё еще сохраняется своего рода правильная вложенность: вы создаете итератор, используете безопасные ссылки какое-то время, а затем уничтожаете итератор.
 
-Only once the iterator is gone can you access the list and call things like `push` and `pop` which need to mess with the tail pointer and Boxes. Now, during the iteration we *are* going to be dereferencing a bunch of raw pointers, so there is a kind of mixing there, but we should be able to think of those references as reborrows of the unsafe pointers.
+Только после того, как итератор исчезнет, вы сможете получить доступ к списку и вызывать такие вещи, как `push` и `pop`, которым нужно возиться с указателем на хвост и `Box`'ами. Теперь, во время итерации мы *собираемся* разыменовывать кучу сырых указателей, так что здесь есть своего рода смешивание, но мы должны быть в состоянии думать об этих ссылках как о перезаимствованиях небезопасных указателей.
 
-*I'm* not even 100% convinced but I just wanna give it a try and see!
+*Я* даже сам не уверен на 100%, но я просто хочу попробовать и посмотреть!
 
 ```rust ,ignore
 pub struct IntoIter<T>(List<T>);
@@ -125,23 +125,23 @@ impl<T> List<T> {
 }
 ```
 
-If we're going to be storing references, we need to upgrade our raw pointers to options-of-references. We *could* check if the pointer is null, but this is one of the incredibly narrow cases where I *think* it's ok to use the nasty [ptr::as_ref](https://doc.rust-lang.org/std/primitive.pointer.html#method.as_ref-1) and [ptr::as_mut](https://doc.rust-lang.org/std/primitive.pointer.html#method.as_mut) methods.
+Если мы собираемся хранить ссылки, нам нужно обновить наши сырые указатели до опций-ссылок (`Option<&T>`). Мы *могли бы* проверить, является ли указатель нулевым, но это один из тех невероятно редких случаев, когда, как мне кажется, можно использовать противные методы [ptr::as_ref](https://doc.rust-lang.org/std/primitive.pointer.html#method.as_ref-1) и [ptr::as_mut](https://doc.rust-lang.org/std/primitive.pointer.html#method.as_mut).
 
-I *usually* recommend avoiding these methods like the plague because they do some surprising and nasty stuff and they're inherently reintroducing references when my whole "easy rule" is to avoid doing that!
+Я *обычно* рекомендую избегать этих методов как чумы, потому что они делают некоторые удивительные и неприятные вещи и по своей сути снова вводят ссылки, когда всё мое «простое правило» состоит в том, чтобы избегать этого!
 
-Those methods come with a lot of warnings, but the most interesting is this:
+Эти методы поставляются с кучей предупреждений, но самое интересное вот это:
 
-> You must enforce Rust’s aliasing rules, since the returned lifetime `'a` is arbitrarily chosen and does not necessarily reflect the actual lifetime of the data. In particular, for the duration of this lifetime, the memory the pointer points to must not get accessed (read or written) through any other pointer.
+> Вы должны соблюдать правила алиасинга Rust, поскольку возвращаемое время жизни `'a` выбирается произвольно и не обязательно отражает фактическое время жизни данных. В частности, на протяжении этого времени жизни к памяти, на которую указывает указатель, нельзя обращаться (для чтения или записи) через любой другой указатель.
 
-Hey look it's the thing we talked about for 25 pages! I have already asserted we're *definitely* going to be fine to use references here, so aliasing solved! The other evil part is the signature:
+Эй, смотрите, это же та вещь, о которой мы говорили 25 страниц! Я уже утверждал, что здесь нам *определенно* будет нормально использовать ссылки, так что с алиасингом разобрались! Другая злая часть — это сигнатура:
 
 ```rust ,ignore
 pub unsafe fn as_mut<'a>(self) -> Option<&'a mut T>
 ```
 
-Do you see how that lifetime isn't attached to the input at all, because `self` is by-value? Yeah that's what we call an "unbounded lifetime" and it's nasty stuff. It's willing to pretend to be as large as we ask it to be, even `'static`! The way you *deal* with that is by putting it somewhere that *is* bounded, which usually just means "return this from a function as soon as possible so that the function signature limits it".
+Вы видите, как это время жизни вообще не привязано к входным данным, потому что `self` передается по значению? Да, это то, что мы называем «несвязанным временем жизни» (unbounded lifetime), и это неприятная штука. Оно готово притвориться настолько большим, насколько мы его попросим, даже `'static`!" Способ *справиться* с этим — поместить его куда-то, что *связано*, что обычно просто означает «вернуть это из функции как можно скорее, чтобы сигнатура функции ограничила его».
 
-Boy I'm nervous about this but we're gonna keep pushing through! Let's steal some iterator impls from the stack:
+Боже, я нервничаю из-за этого, но мы продолжим пробиваться! Давайте украдем несколько реализаций итераторов из стека:
 
 ```rust ,ignore
 impl<T> Iterator for IntoIter<T> {
@@ -178,7 +178,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
 }
 ```
 
-Moment of truth time...
+Время момента истины...
 
 ```text
 cargo test
@@ -226,13 +226,13 @@ test third::test::iter ... ok
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-YES!!! Take that **NARRATOR**! Sometimes I don't make mistakes!
+ДА!!! Выкуси, **РАССКАЗЧИК (NARRATOR)**! Иногда я не совершаю ошибок!
 
-> **NARRATOR**: but wasn't the whole point that the mistakes are there to teach the reader.
+> **РАССКАЗЧИК (NARRATOR)**: но разве не в том был весь смысл, чтобы ошибки учили читателя.
 
-YEAH WELL SOMETIMES THE LESSON IS THAT I'M RIGHT AND EVERYONE SHOULD LISTEN TO ME WHEN I SAY THINGS ABOUT UNSAFE CODE BECAUSE I HAVE SPENT FAR TOO MUCH TIME THINKING ABOUT THE SOUNDNESS OF ITERATOR IMPLEMENTATIONS?! OK?! OK.
+ДА, НУ ТАК ВОТ, ИНОГДА УРОК ЗАКЛЮЧАЕТСЯ В ТОМ, ЧТО Я ПРАВ, И ВСЕ ДОЛЖНЫ СЛУШАТЬ МЕНЯ, КОГДА Я ГОВОРЮ ВЕЩИ О НЕБЕЗОПАСНОМ КОДЕ, ПОТОМУ ЧТО Я ПОТРАТИЛ СЛИШКОМ МНОГО ВРЕМЕНИ, ДУМАЯ О КОРРЕКТНОСТИ (SOUNDNESS) РЕАЛИЗАЦИЙ ИТЕРАТОРОВ?! ОКЕЙ?! ОКЕЙ.
 
-Anyway here's `peek` and `peek_mut`.
+В любом случае, вот `peek` и `peek_mut`.
 
 ```rust ,ignore
 pub fn peek(&self) -> Option<&T> {
@@ -248,9 +248,9 @@ pub fn peek_mut(&mut self) -> Option<&mut T> {
 }
 ```
 
-I'm not even gonna test them because I never make mistakes anymore.
+Я даже не собираюсь их тестировать, потому что я больше никогда не совершаю ошибок.
 
-> **NARRATOR**: `cargo build`
+> **РАССКАЗЧИК (NARRATOR)**: `cargo build`
 
 ```text
 error[E0308]: mismatched types
@@ -272,7 +272,7 @@ error[E0308]: mismatched types
 
 ```
 
-FINE.
+ЛАДНО.
 
 ```rust ,ignore
 pub fn peek(&self) -> Option<&T> {
@@ -288,7 +288,7 @@ pub fn peek_mut(&mut self) -> Option<&mut T> {
 }
 ```
 
-I guess I am going to *continue* to make mistakes, so we're going to be extra careful and add a new test I'm going to call "miri food": something that just messes around and mixes up our APIs a bunch to help miri catch our mistakes.
+Похоже, я *продолжу* совершать ошибки, поэтому мы будем предельно осторожны и добавим новый тест, который я назову «еда для Miri» (miri food): что-то, что просто дурачится и смешивает наши API в кучу, чтобы помочь Miri поймать наши ошибки.
 
 ```rust ,ignore
 #[test]
@@ -326,7 +326,7 @@ fn miri_food() {
     assert!(list.peek() == Some(&5000));
     list.push(7);
 
-    // Drop it on the ground and let the dtor exercise itself
+    // Бросаем его на землю и пусть деструктор поупражняется
 }
 ```
 
@@ -379,4 +379,4 @@ test third::test::basics ... ok
 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
-Perfect.
+Идеально.

@@ -1,9 +1,9 @@
-# Layout
+# Структура (Layout)
 
-So what's a singly-linked queue like? Well, when we had a singly-linked stack
-we pushed onto one end of the list, and then popped off the same end. The only
-difference between a stack and a queue is that a queue pops off the *other*
-end. So from our stack implementation we have:
+Итак, на что похожа односвязная очередь? Ну, когда у нас был односвязный стек,
+мы добавляли элементы в один конец списка и извлекали их из того же конца. Единственная
+разница между стеком и очередью заключается в том, что очередь извлекает элементы с *другого*
+конца. Итак, из нашей реализации стека мы имеем:
 
 ```text
 input list:
@@ -16,12 +16,12 @@ stack pop:
 [Some(ptr)] -> (A, Some(ptr)) -> (B, None)
 ```
 
-To make a queue, we just need to decide which operation to move to the
-end of the list: push, or pop? Since our list is singly-linked, we can
-actually move *either* operation to the end with the same amount of effort.
+Чтобы сделать очередь, нам просто нужно решить, какую операцию переместить в
+конец списка: добавление (`push`) или извлечение (`pop`)? Поскольку наш список односвязный, мы
+можем переместить *любую* операцию в конец с одинаковыми усилиями.
 
-To move `push` to the end, we just walk all the way to the `None` and set it
-to Some with the new element.
+Чтобы переместить `push` в конец, мы просто идем до самого `None` и устанавливаем его
+в `Some` с новым элементом.
 
 ```text
 input list:
@@ -31,8 +31,8 @@ flipped push X:
 [Some(ptr)] -> (A, Some(ptr)) -> (B, Some(ptr)) -> (X, None)
 ```
 
-To move `pop` to the end, we just walk all the way to the node *before* the
-None, and `take` it:
+Чтобы переместить `pop` в конец, мы просто идем до узла *перед*
+`None` и забираем его (`take`):
 
 ```text
 input list:
@@ -42,32 +42,32 @@ flipped pop:
 [Some(ptr)] -> (A, Some(ptr)) -> (B, None)
 ```
 
-We could do this today and call it quits, but that would stink! Both of these
-operations walk over the *entire* list. Some would argue that such a queue
-implementation is indeed a queue because it exposes the right interface. However
-I believe that performance guarantees are part of the interface. I don't care
-about precise asymptotic bounds, just "fast" vs "slow". Queues guarantee
-that push and pop are fast, and walking over the whole list is definitely *not*
-fast.
+Мы могли бы сделать это прямо сейчас и закончить на этом, но это было бы отстойно! Обе эти
+операции обходят *весь* список. Некоторые утверждают, что такая реализация очереди
+действительно является очередью, потому что она предоставляет правильный интерфейс. Однако
+я считаю, что гарантии производительности являются частью интерфейса. Меня не волнуют
+точные асимптотические границы, только «быстро» против «медленно». Очереди гарантируют,
+что добавление и извлечение происходят быстро, а обход всего списка — это определенно *не*
+быстро.
 
-One key observation is that we're wasting a ton of work doing *the same thing*
-over and over. Can we "cache" all that work and reuse it? Why, yes! We can store a pointer to
-the end of the list, and just jump straight to there!
+Одно ключевое наблюдение заключается в том, что мы тратим кучу усилий, делая *одно и то же*
+снова и снова. Можем ли мы «кэшировать» всю эту работу и использовать ее повторно? Да, конечно! Мы можем хранить указатель на
+конец списка и просто прыгать прямо туда!
 
-It turns out that only one inversion of `push` and `pop` works with this.
-To invert `pop` we would have to move the "tail" pointer backwards, but
-because our list is singly-linked, we can't do that efficiently.
-If we instead invert `push` we only have to move the "head" pointer
-forward, which is easy.
+Оказывается, что только одна инверсия `push` и `pop` работает с этим.
+Чтобы инвертировать `pop`, нам пришлось бы двигать указатель на «хвост» (tail) назад, но
+поскольку наш список односвязный, мы не можем сделать это эффективно.
+Если мы вместо этого инвертируем `push`, нам нужно только двигать указатель на «голову» (head)
+вперед, что легко.
 
-Let's try that:
+Давайте попробуем:
 
 ```rust ,ignore
 use std::mem;
 
 pub struct List<T> {
     head: Link<T>,
-    tail: Link<T>, // NEW!
+    tail: Link<T>, // НОВОЕ!
 }
 
 type Link<T> = Option<Box<Node<T>>>;
@@ -85,20 +85,20 @@ impl<T> List<T> {
     pub fn push(&mut self, elem: T) {
         let new_tail = Box::new(Node {
             elem: elem,
-            // When you push onto the tail, your next is always None
+            // Когда вы добавляете в хвост, ваш next всегда None
             next: None,
         });
 
-        // swap the old tail to point to the new tail
+        // меняем старый хвост так, чтобы он указывал на новый хвост
         let old_tail = mem::replace(&mut self.tail, Some(new_tail));
 
         match old_tail {
             Some(mut old_tail) => {
-                // If the old tail existed, update it to point to the new tail
+                // Если старый хвост существовал, обновляем его, чтобы он указывал на новый хвост
                 old_tail.next = Some(new_tail);
             }
             None => {
-                // Otherwise, update the head to point to it
+                // В противном случае обновляем голову, чтобы она указывала на него
                 self.head = Some(new_tail);
             }
         }
@@ -106,13 +106,13 @@ impl<T> List<T> {
 }
 ```
 
-I'm going a bit faster with the impl details now since we should be pretty
-comfortable with this sort of thing. Not that you should necessarily expect
-to produce this code on the first try. I'm just skipping over some of the
-trial-and-error we've had to deal with before. I actually made a ton of mistakes
-writing this code that I'm not showing, but you can only see me leave off a `mut` or
-`;` so many times before it stops being instructive. Don't worry, we'll see
-plenty of *other* error messages!
+Теперь я буду двигаться немного быстрее с деталями реализации, так как мы уже должны
+чувствовать себя вполне комфортно с подобными вещами. Это не значит, что вы обязательно должны
+написать этот код с первой попытки. Я просто пропускаю часть метода проб и ошибок,
+с которыми нам приходилось иметь дело раньше. На самом деле я сделал кучу ошибок
+при написании этого кода, которые я не показываю, но вы можете видеть, как я забываю `mut` или
+`;` лишь ограниченное количество раз, прежде чем это перестанет быть поучительным. Не волнуйтесь, мы увидим
+множество *других* сообщений об ошибках!
 
 ```text
 > cargo build
@@ -130,22 +130,22 @@ error[E0382]: use of moved value: `new_tail`
    |                                      ^^^^^^^^ value used here after move
 ```
 
-Shoot!
+Черт!
 
-> use of moved value: `new_tail`
+> use of moved value: `new_tail` (использование перемещенного значения)
 
-Box doesn't implement Copy, so we can't just assign it to two locations. More
-importantly, Box *owns* the thing it points to, and will try to free it when
-it's dropped. If our `push` implementation compiled, we'd double-free the tail
-of our list! Actually, as written, our code would free the old_tail on every
-push. Yikes! 🙀
+`Box` не реализует `Copy`, поэтому мы не можем просто присвоить его двум местам. Более
+важно то, что `Box` *владеет* тем, на что он указывает, и попытается освободить память, когда
+он будет удален. Если бы наша реализация `push` скомпилировалась, мы бы дважды освободили хвост
+нашего списка! На самом деле, в том виде, в каком он написан, наш код освобождал бы `old_tail` при каждом
+добавлении. Ой-ой-ой! 🙀
 
-Alright, well we know how to make a non-owning pointer. That's just a reference!
+Хорошо, ну мы знаем, как сделать невладеющий указатель. Это просто ссылка!
 
 ```rust ,ignore
 pub struct List<T> {
     head: Link<T>,
-    tail: Option<&mut Node<T>>, // NEW!
+    tail: Option<&mut Node<T>>, // НОВОЕ!
 }
 
 type Link<T> = Option<Box<Node<T>>>;
@@ -163,19 +163,19 @@ impl<T> List<T> {
     pub fn push(&mut self, elem: T) {
         let new_tail = Box::new(Node {
             elem: elem,
-            // When you push onto the tail, your next is always None
+            // Когда вы добавляете в хвост, ваш next всегда None
             next: None,
         });
 
-        // Put the box in the right place, and then grab a reference to its Node
+        // Помещаем бокс в нужное место, а затем берем ссылку на его Node
         let new_tail = match self.tail.take() {
             Some(old_tail) => {
-                // If the old tail existed, update it to point to the new tail
+                // Если старый хвост существовал, обновляем его, чтобы он указывал на новый хвост
                 old_tail.next = Some(new_tail);
                 old_tail.next.as_deref_mut()
             }
             None => {
-                // Otherwise, update the head to point to it
+                // В противном случае обновляем голову, чтобы она указывала на него
                 self.head = Some(new_tail);
                 self.head.as_deref_mut()
             }
@@ -186,28 +186,28 @@ impl<T> List<T> {
 }
 ```
 
-Nothing too tricky here. Same basic idea as the previous code, except we're
-using some of that implicit return goodness to extract the tail reference from
-wherever we stuff the actual Box.
+Ничего слишком сложного здесь нет. Та же базовая идея, что и в предыдущем коде, за исключением того, что мы
+используем часть этой неявной магии возврата, чтобы извлечь ссылку на хвост из
+того места, куда мы поместили сам `Box`.
 
 ```text
 > cargo build
 
 error[E0106]: missing lifetime specifier
- --> src/fifth.rs:3:18
-  |
+  --> src/fifth.rs:3:18
+   |
 3 |     tail: Option<&mut Node<T>>, // NEW!
-  |                  ^ expected lifetime parameter
+   |                  ^ expected lifetime parameter
 ```
 
-Oh right, we need to give lifetimes to references in types. Hmm... what's the
-lifetime of this reference? Well, this seems like IterMut, right? Let's try
-what we did for IterMut, and just add a generic `'a`:
+О, точно, нам нужно указывать времена жизни для ссылок в типах. Хм... каково
+время жизни этой ссылки? Ну, это похоже на `IterMut`, верно? Давайте попробуем
+то, что мы сделали для `IterMut`, и просто добавим обобщенное `'a`:
 
 ```rust ,ignore
 pub struct List<'a, T> {
     head: Link<T>,
-    tail: Option<&'a mut Node<T>>, // NEW!
+    tail: Option<&'a mut Node<T>>, // НОВОЕ!
 }
 
 type Link<T> = Option<Box<Node<T>>>;
@@ -225,19 +225,19 @@ impl<'a, T> List<'a, T> {
     pub fn push(&mut self, elem: T) {
         let new_tail = Box::new(Node {
             elem: elem,
-            // When you push onto the tail, your next is always None
+            // Когда вы добавляете в хвост, ваш next всегда None
             next: None,
         });
 
-        // Put the box in the right place, and then grab a reference to its Node
+        // Помещаем бокс в нужное место, а затем берем ссылку на его Node
         let new_tail = match self.tail.take() {
             Some(old_tail) => {
-                // If the old tail existed, update it to point to the new tail
+                // Если старый хвост существовал, обновляем его, чтобы он указывал на новый хвост
                 old_tail.next = Some(new_tail);
                 old_tail.next.as_deref_mut()
             }
             None => {
-                // Otherwise, update the head to point to it
+                // В противном случае обновляем голову, чтобы она указывала на него
                 self.head = Some(new_tail);
                 self.head.as_deref_mut()
             }
@@ -263,7 +263,7 @@ note: first, the lifetime cannot outlive the anonymous lifetime #1 defined on th
 18 | /     pub fn push(&mut self, elem: T) {
 19 | |         let new_tail = Box::new(Node {
 20 | |             elem: elem,
-21 | |             // When you push onto the tail, your next is always None
+21 | |             // Когда вы добавляете в хвост, ваш next всегда None
 ...  |
 39 | |         self.tail = new_tail;
 40 | |     }
@@ -279,19 +279,19 @@ note: but, the lifetime must be valid for the lifetime 'a as defined on the impl
 13 | impl<'a, T> List<'a, T> {
    |      ^^
    = note: ...so that the expression is assignable:
-           expected std::option::Option<&'a mut fifth::Node<T>>
-              found std::option::Option<&mut fifth::Node<T>>
+            expected std::option::Option<&'a mut fifth::Node<T>>
+               found std::option::Option<&mut fifth::Node<T>>
 
 
 ```
 
-Woah, that's a really detailed error message. That's a bit concerning, because it
-suggests we're doing something really messed up. Here's an interesting part:
+Вау, это действительно подробное сообщение об ошибке. Это немного беспокоит, потому что оно
+предполагает, что мы делаем что-то действительно неправильное. Вот интересная часть:
 
-> the lifetime must be valid for the lifetime `'a` as defined on the impl
+> the lifetime must be valid for the lifetime `'a` as defined on the impl (время жизни должно быть валидно для времени жизни `'a`, определенного в реализации)
 
-We're borrowing from `self`, but the compiler wants us to last as long as `'a`,
-what if we tell it `self` *does* last that long..?
+Мы заимствуем из `self`, но компилятор хочет, чтобы мы жили так же долго, как `'a`.
+Что, если мы скажем ему, что `self` *действительно* живет так долго..?
 
 ```rust ,ignore
     pub fn push(&'a mut self, elem: T) {
@@ -301,26 +301,26 @@ what if we tell it `self` *does* last that long..?
 cargo build
 
 warning: field is never used: `elem`
- --> src/fifth.rs:9:5
-  |
+  --> src/fifth.rs:9:5
+   |
 9 |     elem: T,
-  |     ^^^^^^^
-  |
-  = note: #[warn(dead_code)] on by default
+   |     ^^^^^^^
+   |
+   = note: #[warn(dead_code)] on by default
 ```
 
-Oh, hey, that worked! Great!
+О, смотри-ка, это сработало! Отлично!
 
-Let's just do `pop` too:
+Давайте сделаем и `pop`:
 
 ```rust ,ignore
 pub fn pop(&'a mut self) -> Option<T> {
-    // Grab the list's current head
+    // Берем текущую голову списка
     self.head.take().map(|head| {
         let head = *head;
         self.head = head.next;
 
-        // If we're out of `head`, make sure to set the tail to `None`.
+        // Если у нас кончилась `head`, обязательно устанавливаем tail в `None`.
         if self.head.is_none() {
             self.tail = None;
         }
@@ -330,7 +330,7 @@ pub fn pop(&'a mut self) -> Option<T> {
 }
 ```
 
-And write a quick test for that:
+И напишем быстрый тест для этого:
 
 ```rust ,ignore
 #[cfg(test)]
@@ -340,27 +340,27 @@ mod test {
     fn basics() {
         let mut list = List::new();
 
-        // Check empty list behaves right
+        // Проверяем, что пустой список ведет себя правильно
         assert_eq!(list.pop(), None);
 
-        // Populate list
+        // Заполняем список
         list.push(1);
         list.push(2);
         list.push(3);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop(), Some(1));
         assert_eq!(list.pop(), Some(2));
 
-        // Push some more just to make sure nothing's corrupted
+        // Добавляем еще немного, чтобы убедиться, что ничего не испортилось
         list.push(4);
         list.push(5);
 
-        // Check normal removal
+        // Проверяем нормальное извлечение
         assert_eq!(list.pop(), Some(3));
         assert_eq!(list.pop(), Some(4));
 
-        // Check exhaustion
+        // Проверяем исчерпание списка
         assert_eq!(list.pop(), Some(5));
         assert_eq!(list.pop(), None);
     }
@@ -409,7 +409,7 @@ error[E0499]: cannot borrow `list` as mutable more than once at a time
 
 ....
 
-** WAY MORE LINES OF ERRORS **
+** ЕЩЕ МНОГО СТРОК С ОШИБКАМИ **
 
 ....
 
@@ -418,59 +418,59 @@ error: aborting due to 11 previous errors
 
 🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀🙀
 
-Oh my goodness.
+О боже мой.
 
-The compiler's not wrong for vomiting all over us. We just committed a
-cardinal Rust sin: we stored a reference to ourselves *inside ourselves*.
-Somehow, we managed to convince Rust that this totally made sense in our
-`push` and `pop` implementations (I was legitimately shocked we did). 
+Компилятор не ошибается, когда его буквально тошнит на нас (vomiting all over us). Мы только что совершили
+главный грех Rust: мы сохранили ссылку на самих себя *внутри самих себя*.
+Каким-то образом нам удалось убедить Rust, что это имеет полный смысл в наших
+реализациях `push` и `pop` (я был искренне шокирован, что нам это удалось).
 
-The reason this *sort of* works is that Rust doesn't really have the notion
-of a pointer into yourself at all. Each part of the code is *technically* correct
-in isolation (we *can* call push and pop *once*) but then the absurdity of what
-we created takes affect and everything just *locks up*. 
+Причина, по которой это *как бы* работает, заключается в том, что в Rust вообще нет понятия
+указателя на самого себя. Каждая часть кода *технически* верна
+изолированно (мы *можем* вызвать `push` и `pop` *один раз*), но затем абсурдность того,
+что мы создали, вступает в силу, и всё просто *блокируется*.
 
-I'm sure there is *some* use for what we've written, but as far as *I'm* concerned it's
-just syntatically valid *gibberish*. We're saying we contain something with
-lifetime `'a`,  and that `push` and `pop` borrows *self* for that lifetime. 
-That's *weird* but Rust can look at each part of our code *individually* and
-it doesn't see any rules being broken.
+Я уверен, что есть *какое-то* применение тому, что мы написали, но что касается *меня*, то это
+просто синтаксически верная *тарабарщина*. Мы говорим, что мы содержим что-то со
+временем жизни `'a`, и что `push` и `pop` заимствуют `self` на это время жизни.
+Это *странно*, но Rust может смотреть на каждую часть нашего кода *индивидуально*, и
+он не видит нарушений правил.
 
-But as soon as we try to actually *use* the list, the compiler quickly goes 
-"yep you've borrowed `self` mutably for `'a`, so you can't use `self` anymore
-until the end of `'a`" but *also* "because you contain `'a`, it must be valid
-for the entire list's existence".
+Но как только мы пытаемся действительно *использовать* список, компилятор быстро говорит:
+«Да, вы заимствовали `self` изменяемо на `'a`, поэтому вы больше не можете использовать `self`
+до конца `'a`», но *также* «поскольку вы содержите `'a`, оно должно быть валидно
+в течение всего времени существования списка».
 
-It's *nearly* a contradiction but there *is* one solution: as soon as you `push`
-or `pop`, the list "pins" itself in place and can't be accessed anymore. It has
-swallowed its own proverbial tail, and ascended to a world of dreams.
+Это *почти* противоречие, но есть одно решение: как только вы вызываете `push`
+или `pop`, список «пришпиливает» (pins) себя на месте и больше не может быть доступен. Он
+проглотил свой собственный пресловутый хвост и вознесся в мир грез.
 
-> **NARRATOR**: it didn't exist when this book was first written, but Rust
-> actually [formalized the notion of a *pin* into something useful][pin]! 
-> This was probably the most complex addition to the language since 
-> *the borrowchecker*. We don't *want* our list to be pinned though!
+> **РАССКАЗЧИК (NARRATOR)**: этого не существовало, когда эта книга была впервые написана, но Rust
+> фактически [формализовал понятие *pin* (закрепления) во что-то полезное][pin]!
+> Это было, вероятно, самое сложное дополнение к языку со времен
+> *borrowchecker'а*. Мы же не *хотим*, чтобы наш список был закреплен!
 >
-> Pins *are* necessary and useful for async-await/futures/coroutines because
-> the compiler needs to be able to bundle up all the local variables of a
-> function into some kind of struct and store them somewhere until the 
-> future/coroutine is ready to be resumed. Since local variables can reference
-> other local variables, and we want that to *work*, these structs can end
-> up containing references to themselves!
+> Закрепления (*Pins*) *необходимы* и полезны для async-await/futures/coroutines, потому что
+> компилятору нужно иметь возможность упаковать все локальные переменные
+> функции в какую-то структуру и сохранить их где-то, пока
+> future/coroutine не будет готова к возобновлению. Поскольку локальные переменные могут ссылаться
+> на другие локальные переменные, и мы хотим, чтобы это *работало*, эти структуры могут в итоге
+> содержать ссылки на самих себя!
 >
-> So to `await` or `yield` Rust needs a way to be able to properly describe
-> and manipulate pinned values. Thankfully all of this stuff is *largely*
-> just hidden away in automatic compiler machinery and no one actually has to
-> think about `Pin` (or even *Futures*) under normal circumstances. The main
-> exception is that this stuff is very important for the folks building and
-> designing async *runtimes* like tokio.
+> Поэтому для `await` или `yield` Rust нужен способ правильно описывать
+> и манипулировать закрепленными значениями. К счастью, всё это *по большей части*
+> просто скрыто в автоматических механизмах компилятора, и никому на самом деле не приходится
+> думать о `Pin` (или даже о *Futures*) в обычных обстоятельствах. Главное
+> исключение заключается в том, что эти вещи очень важны для людей, создающих и
+> проектирующих асинхронные *среды выполнения (runtimes)*, такие как tokio.
 >
-> We will not be implementing an async runtime in this book. I know my friends
-> know all sorts of "cool" (messed up) *tricks* you can do with `Pin`,
-> but from what I can tell, I'd be happier to just not know them. I will
-> continue to tell myself that Pinned types aren't real and they can't hurt me. 
+> Мы не будем реализовывать асинхронную среду выполнения в этой книге. Я знаю, что мои друзья
+> знают всевозможные «крутые» (испорченные) *трюки*, которые можно делать с `Pin`,
+> но, насколько я могу судить, я был бы счастливее, просто не зная их. Я буду
+> продолжать говорить себе, что закрепленных типов не существует и они не могут мне навредить.
 
-Our `pop` implementation hints at why storing a reference to ourselves
-*inside* ourselves could be really dangerous:
+Наша реализация `pop` намекает на то, почему сохранение ссылки на самих себя
+*внутри* самих себя может быть действительно опасным:
 
 ```rust ,ignore
 // ...
@@ -479,24 +479,24 @@ if self.head.is_none() {
 }
 ```
 
-What if we forgot to do this? Then our tail would point to some node *that
-had been removed from the list*. Such a node would be instantly freed, and we'd
-have a dangling pointer which Rust was supposed to protect us from!
+Что, если мы забудем это сделать? Тогда наш хвост будет указывать на какой-то узел, *который
+был удален из списка*. Такой узел был бы мгновенно освобожден, и мы получили бы
+висячий указатель, от которых Rust должен был нас защитить!
 
-And indeed Rust is protecting us from that kind of danger. Just in a very...
-**roundabout** way.
+И действительно, Rust защищает нас от такого рода опасности. Просто очень...
+**окольным** путем.
 
-So what can we do? Go back to `Rc<RefCell>>` hell?
+Так что же мы можем сделать? Вернуться в ад `Rc<RefCell>`?
 
-Please. No.
+Пожалуйста. Нет.
 
-No, instead we're going to go off the rails and use *raw pointers*.
-Our layout is going to look like this:
+Нет, вместо этого мы сойдем с рельсов и будем использовать *сырые указатели (raw pointers)*.
+Наша структура будет выглядеть так:
 
 ```rust ,ignore
 pub struct List<T> {
     head: Link<T>,
-    tail: *mut Node<T>, // DANGER DANGER
+    tail: *mut Node<T>, // ОПАСНО ОПАСНО
 }
 
 type Link<T> = Option<Box<Node<T>>>;
@@ -508,18 +508,18 @@ struct Node<T> {
 ```
 
 
-And that's that. None of this wimpy reference-counted-dynamic-borrow-checking
-nonsense! Real. Hard. Unchecked. Pointers.
+И на этом всё. Никакой этой слабой чепухи с подсчетом ссылок и динамической проверкой заимствований!
+Настоящие. Жесткие. Непроверенные. Указатели.
 
-> **NARRATOR:** This implementation was in fact still dangerously wrong, but it wasn't yet time to learn that lesson. The next section will learn that the hard way, as usual.
+> **РАССКАЗЧИК (NARRATOR):** Эта реализация на самом деле всё еще была опасно неправильной, но время для усвоения этого урока еще не пришло. В следующем разделе это будет усвоено трудным путем, как обычно.
 
-Let's be C everyone. Let's be C all day.
+Давайте все побудем на Си. Давайте побудем на Си весь день.
 
-I'm home. I'm ready.
+Я дома. Я готов.
 
-Hello `unsafe`.
+Привет, `unsafe`.
 
-> **NARRATOR:** Wow, just incredible hubris from the author here.
+> **РАССКАЗЧИК (NARRATOR):** Вау, просто невероятная гордыня со стороны автора.
 
 
 [pin]: https://doc.rust-lang.org/std/pin/index.html

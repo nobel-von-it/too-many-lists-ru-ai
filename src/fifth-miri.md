@@ -1,34 +1,34 @@
 # Miri
 
-*nervously laughs* This unsafe stuff is so easy, I don't know why everyone says otherwise. Our program works perfectly.
+*нервно смеется* Эти небезопасные штуки такие простые, я не знаю, почему все говорят обратное. Наша программа работает идеально.
 
-> **NARRATOR:** 🙂
+> **РАССКАЗЧИК (NARRATOR):** 🙂
 
-...right?
+...верно?
 
-> **NARRATOR:** 🙂
+> **РАССКАЗЧИК (NARRATOR):** 🙂
 
-Well, we're writing `unsafe` code now, so the compiler can't help us catch mistakes as well. It could be that the tests *happened* to work, but were actually doing something non-deterministic. Something Undefined Behavioury.
+Ну, теперь мы пишем `unsafe` код, поэтому компилятор не может помочь нам отлавливать ошибки так же хорошо. Может быть, тестам просто *повезло* сработать, но на самом деле они делали что-то недетерминированное. Что-то из разряда Неопределенного Поведения (Undefined Behavioury).
 
-But what can we do? We've pried open the windows and snuck out of rustc's classroom. No one can help us now.
+Но что мы можем сделать? Мы приоткрыли окна и выскользнули из класса `rustc`. Теперь нам никто не может помочь.
 
-...Wait, who's that sketchy looking person in the alleyway?
+...Подождите, кто это там за углом такой подозрительный?
 
-*"Hey kid, you wanna interpret some Rust code?"*
+*"Эй, парень, не хочешь проинтерпретировать немного кода на Rust?"*
 
-Wh- no? Why,
+Чт... нет? С чего бы,
 
-*"It's wild man, it can validate that the actual dynamic execution of your program conforms to the semantics of Rust's memory model. Blows your mind..."*
+*"Это безумие, чувак, он может проверить, что реальное динамическое выполнение твоей программы соответствует семантике модели памяти Rust. Мозг взрывает..."*
 
-What?
+Что?
 
-*"It checks if you Do An Undefined Behaviour."*
+*"Он проверяет, не совершаешь ли ты Неопределенное Поведение."*
 
-I guess I could try interpretters just *once*.
+Думаю, я мог бы попробовать интерпретаторы всего *один разок*.
 
-*"You've got rustup installed right?"*
+*"У тебя же установлен rustup, верно?"*
 
-Of course I do, it's *the* tool for having an up to date Rust toolchain!
+Конечно, это же *тот самый* инструмент для поддержания тулчейна Rust в актуальном состоянии!
 
 ```text
 > rustup +nightly-2022-01-21 component add miri
@@ -51,28 +51,25 @@ info: downloading component 'miri'
 info: installing component 'miri'
 ```
 
-What did you just install on my computer!?
+Что ты только что установил на мой компьютер!?
 
-*"The Good Stuff"*
+*"Годный стафф (The Good Stuff)"*
 
-> **NARRATOR:** Some weird stuff going on with toolchain versions:
+> **РАССКАЗЧИК (NARRATOR):** Тут происходят странные вещи с версиями тулчейнов:
 >
-> The tool we're installing, `miri`, works closely with rustc's internals, 
-> so it's only available for nightly toolchains.
+> Инструмент, который мы устанавливаем, `miri`, тесно работает с внутренностями `rustc`,
+> поэтому он доступен только для тулчейнов `nightly`.
 >
-> `+nightly-2022-01-21` tells `rustup` we want to install miri with the rust 
-> nightly toolchain for that date. I'm giving a specific date because sometimes
-> miri falls behind and can't be built for a few nightlies. rustup will
-> automatically download whatever toolchain we specify with `+` if we don't
-> have it installed yet.
+> `+nightly-2022-01-21` сообщает `rustup`, что мы хотим установить `miri` с тулчейном Rust `nightly` за эту дату. Я указываю конкретную дату, потому что иногда
+> `miri` отстает и не может быть собран для некоторых `nightly` версий. `rustup`
+> автоматически скачает любой тулчейн, который мы укажем с помощью `+`, если он у нас еще не установлен.
 >
-> 2022-01-21 is just a nightly I know has miri support, which you can check 
-> [on this status page](https://rust-lang.github.io/rustup-components-history/).
-> You can just use `+nightly` if you're feeling lucky.
-> 
-> Whenever we invoke miri via `cargo miri` we will also use this `+` syntax to
-> specify the toolchain we installed miri on. If you don't want to have to
-> specify it every time, you can use [`rustup override set`](https://rust-lang.github.io/rustup/overrides.html).
+> 2022-01-21 — это просто `nightly` версия, о которой я знаю, что она поддерживает `miri`, что вы можете проверить
+> [на этой странице статуса](https://rust-lang.github.io/rustup-components-history/).
+> Вы можете просто использовать `+nightly`, если чувствуете себя удачливым.
+>
+> Всякий раз, когда мы вызываем `miri` через `cargo miri`, мы также будем использовать этот синтаксис `+`, чтобы
+> указать тулчейн, на который мы установили `miri`. Если вы не хотите указывать его каждый раз, вы можете использовать [`rustup override set`](https://rust-lang.github.io/rustup/overrides.html).
 
 ```text
 > cargo +nightly-2022-01-21 miri test
@@ -81,9 +78,9 @@ I will run `"cargo.exe" "install" "xargo"` to install
 a recent enough xargo. Proceed? [Y/n]
 ```
 
-UH WHAT ON EARTH IS XARGO?
+ЭЭЭ, ЧТО ЕЩЕ ЗА XARGO?
 
-*"It's fine, don't worry about it."*
+*"Всё нормально, не переживай из-за этого."*
 
 ```text
 > y
@@ -100,9 +97,9 @@ I will run `"rustup" "component" "add" "rust-src"` to install
 the `rust-src` component for the selected toolchain. Proceed? [Y/n]
 ```
 
-UH???
+ЭЭЭ???
 
-*"Who doesn't love having a copy of Rust's source code?"*
+*"Кто же не любит иметь копию исходного кода Rust?"*
 
 ```text
 > y
@@ -111,7 +108,7 @@ info: downloading component 'rust-src'
 info: installing component 'rust-src'
 ```
 
-*"Aw yeah it's ready, here's the good part."*
+*"О да, всё готово, вот самая смачная часть."*
 
 ```text
    Compiling lists v0.1.0 (C:\Users\ninte\dev\tmp\lists)
@@ -144,7 +141,7 @@ note: inside `fifth::List::<i32>::pop` at src\fifth.rs:31:9
 32  | |             let head = *head;
 33  | |             self.head = head.next;
 34  | |
-...   |
+35  | ...   |
 39  | |             head.elem
 40  | |         })
     | |__________^
@@ -162,7 +159,7 @@ note: inside closure at src\fifth.rs:62:5
 63  | |         let mut list = List::new();
 64  | |
 65  | |         // Check empty list behaves right
-...   |
+66  | ...   |
 96  | |         assert_eq!(list.pop(), None);
 97  | |     }
     | |_____^
@@ -170,58 +167,58 @@ note: inside closure at src\fifth.rs:62:5
 error: aborting due to previous error
 ```
 
-Woah. That's one heck of an error.
+Ого. Вот это ошибка так ошибка.
 
-*"Yeah, look at that shit. You love to see it."*
+*"Да, взгляни на это дерьмо. Любо-дорого смотреть."*
 
-Thank you?
+Спасибо?
 
-*"Here take the bottle of estradiol too, you're gonna need it later."*
+*"На, держи еще флакон эстрадиола, тебе это понадобится позже."*
 
-Wait why?
+Подожди, зачем?
 
-*"You're about to think about memory models, trust me."*
+*"Ты сейчас начнешь думать о моделях памяти, поверь мне."*
 
-> **NARRATOR:** The mysterious person then proceeded to transform into a fox and scampered through a hole in the wall. The author then stared into the middle distance for several minutes while they tried to process everything that just happened.
+> **РАССКАЗЧИК (NARRATOR):** Таинственный незнакомец затем превратился в лису и шмыгнул в дыру в стене. Автор после этого несколько минут смотрел в пустоту, пытаясь переварить всё, что только что произошло.
 
 
 -------
 
-The mysterious fox in the alleyway was right about more than just my gender: miri really is The Good Shit.
+Таинственная лиса в переулке была права не только насчет моего пола: `miri` — это действительно Годный Стафф (The Good Shit).
 
-Ok so what *is* [miri](https://github.com/rust-lang/miri)?
+Итак, что же такое [miri](https://github.com/rust-lang/miri)?
 
-> An experimental interpreter for Rust's mid-level intermediate representation (MIR). It can run binaries and test suites of cargo projects and detect certain classes of undefined behavior, for example:
+> Экспериментальный интерпретатор для среднеуровневого промежуточного представления (MIR) Rust. Он может запускать бинарные файлы и наборы тестов проектов cargo и обнаруживать определенные классы неопределенного поведения, например:
 >
-> * Out-of-bounds memory accesses and use-after-free
-> * Invalid use of uninitialized data
-> * Violation of intrinsic preconditions (an unreachable_unchecked being reached, calling copy_nonoverlapping with overlapping ranges, ...)
-> * Not sufficiently aligned memory accesses and references
-> * Violation of some basic type invariants (a bool that is not 0 or 1, for example, or an invalid enum discriminant)
-> * Experimental: Violations of the Stacked Borrows rules governing aliasing for reference types
-> * Experimental: Data races (but no weak memory effects)
+> * Доступ к памяти вне границ и использование после освобождения (use-after-free).
+> * Некорректное использование неинициализированных данных.
+> * Нарушение внутренних предусловий (достижение `unreachable_unchecked`, вызов `copy_nonoverlapping` с перекрывающимися диапазонами и т.д.).
+> * Недостаточно выровненный доступ к памяти и ссылки.
+> * Нарушение некоторых базовых инвариантов типов (например, `bool`, который не равен 0 или 1, или невалидный дискриминант перечисления).
+> * Экспериментально: Нарушения правил Stacked Borrows, регулирующих алиасинг для ссылочных типов.
+> * Экспериментально: Состояния гонки данных (но без эффектов слабой памяти).
 >
-> On top of that, Miri will also tell you about memory leaks: when there is memory still allocated at the end of the execution, and that memory is not reachable from a global static, Miri will raise an error.
+> Кроме того, Miri также сообщит вам об утечках памяти: если в конце выполнения все еще есть выделенная память, и эта память недостижима из глобального статического контекста, Miri вызовет ошибку.
 >
 > ...
 >
-> However, be aware that Miri will not catch all cases of undefined behavior in your program, and cannot run all programs
+> Однако имейте в виду, что Miri не поймает все случаи неопределенного поведения в вашей программе и не может запустить все программы.
 
-TL;DR: it interprets your program and notices if you break the rules *at runtime* and Do An Undefined Behaviour. This is necessary because Undefined Behaviour is *generally* a thing that happens at runtime. If the issue could be found at compile time, the compiler would just make it an error!
+TL;DR: он интерпретирует вашу программу и замечает, если вы нарушаете правила *во время выполнения* и совершаете Неопределенное Поведение. Это необходимо, потому что Неопределенное Поведение — это *обычно* вещь, которая происходит во время выполнения. Если бы проблему можно было найти во время компиляции, компилятор просто сделал бы ее ошибкой!
 
-If you're familiar with tools like ubsan and tsan: it's basically that but all together and more extreme.
+Если вы знакомы с такими инструментами, как `ubsan` и `tsan`: это в основном то же самое, но всё вместе и в более экстремальном виде.
 
 -------
 
-Miri is now hanging outside the classroom window with a knife. A learning knife.
+`Miri` теперь висит за окном класса с ножом. С обучающим ножом.
 
-If we ever want miri to check our work, we can ask them to interpret our test suite with
+Если мы когда-нибудь захотим, чтобы `miri` проверил нашу работу, мы можем попросить его проинтерпретировать наш набор тестов с помощью
 
 ```text
 > cargo +nightly-2022-01-21 miri test
 ```
 
-Now let's take a closer look at what they carved into our desk:
+Теперь давайте поближе посмотрим на то, что он вырезал на нашей парте:
 
 ```text
 error: Undefined Behavior: trying to reborrow for Unique at alloc84055, but parent tag <209678> does not have an appropriate item in the borrow stack
@@ -243,6 +240,6 @@ error: Undefined Behavior: trying to reborrow for Unique at alloc84055, but pare
       for further information
 ```
 
-Well I can see we made an error, but that's a confusing error message. What's the "borrow stack"?
+Ну, я вижу, что мы сделали ошибку, но это сбивающее с толку сообщение об ошибке. Что такое "borrow stack" (стек заимствований)?
 
-We'll try to figure that out in the next section.
+Мы попытаемся выяснить это в следующем разделе.

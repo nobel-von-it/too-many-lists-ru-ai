@@ -1,79 +1,81 @@
-# Attempting To Understand Stacked Borrows
+# Попытка понять Stacked Borrows
 
-In the previous section we tried running our unsafe singly-linked queue under miri, and it said we had broken the rules of *stacked borrows*, and linked us some documentation.
+В предыдущем разделе мы попытались запустить нашу небезопасную односвязную очередь под Miri, и он сказал, что мы нарушили правила *stacked borrows* (стека заимствований), и дал ссылку на документацию.
 
 Normally I'd give a guided tour of the docs, but we're not really the target audience of that documentation. It's more designed for compiler developers and academics who are working on the semantics of Rust. 
 
-So I'm going to just give you the high level *idea* of "stacked borrows", and then give you a simple strategy for following the rules.
+Обычно я бы провел экскурсию по документации, но мы не совсем целевая аудитория этой документации. Она больше предназначена для разработчиков компиляторов и ученых, которые работают над семантикой Rust.
 
-> **NARRATOR:** Stacked borrows are still "experimental" as a semantic model for Rust, so breaking these rules may not actually mean your program is "wrong". But unless you literally work on the compiler, you should just fix your program when miri complains. Better safe than sorry when it comes to Undefined Behaviour.
+Поэтому я просто изложу вам высокоуровневую *идею* "stacked borrows", а затем дам простую стратегию следования этим правилам.
+
+> **РАССКАЗЧИК (NARRATOR):** Stacked borrows всё еще являются «экспериментальной» семантической моделью для Rust, поэтому нарушение этих правил может не означать, что ваша программа на самом деле «неправильная». Но если вы буквально не работаете над компилятором, вам просто следует исправить программу, когда Miri жалуется. Лучше перестраховаться, когда дело касается Неопределенного Поведения.
 
 
 
-# The Motivation: Pointer Aliasing
+# Мотивация: Алиасинг указателей (Pointer Aliasing)
 
-Before we get into *what* rules we've broken, it will help to understand *why* the rules exist in the first place. There are a few different motivating problems, but I think the most important one is *pointer aliasing*.
+Прежде чем мы перейдем к тому, *какие* правила мы нарушили, будет полезно понять, *почему* эти правила вообще существуют. Есть несколько различных мотивирующих проблем, но я думаю, что самая важная из них — это *алиасинг указателей (pointer aliasing)*.
 
-We say two pointers *alias* when the pieces of memory they point to overlap. Just as someone who "goes by an alias" can be referred to by two different names, that overlapping piece of memory can be referred to by two different pointers. This can lead to problems.
+Мы говорим, что два указателя *алиасят (alias)* друг друга, когда участки памяти, на которые они указывают, перекрываются. Так же как человек, который «использует псевдоним (goes by an alias)», может называться двумя разными именами, так и на этот перекрывающийся участок памяти могут ссылаться два разных указателя. Это может привести к проблемам.
 
-The compiler uses information about pointer aliasing to optimize accesses to memory, so if the information it has is *wrong* then the program will be miscompiled and do random garbage. 
+Компилятор использует информацию об алиасинге указателей для оптимизации доступа к памяти, поэтому, если имеющаяся у него информация *неверна*, программа будет скомпилирована неправильно и будет выдавать случайный мусор.
 
-> **NARRATOR:** Practically speaking, aliasing is more concerned with memory accesses than the pointers themselves, and only really matters when one of the accesses is mutating. Pointers are emphasized because they're a convenient thing to attach rules to.
+> **РАССКАЗЧИК (NARRATOR):** Практически говоря, алиасинг больше касается доступа к памяти, чем самих указателей, и имеет значение только тогда, когда один из доступов является изменяющим. Указатели подчеркиваются потому, что к ним удобно привязывать правила.
 
-To understand why pointer aliasing information is important, let's consider *The Parable of the Tiny Angry Man*. 
-
-----
-
-Michiel was looking through their bookshelf one day when they saw a book they didn't remember. They pulled it from the bookcase and looked at the cover. 
-
-"Oh yes, my old copy of *War and Peace*, a book I definitely have read. I loved the part with all the Peace."
-
-Suddenly there was a knock at the door. Michiel returned the book to its shelf and opened the door -- it was their sworn nemesis **Hamslaw**. As Hamslaw prepared a devastating remark about Michiel's clearly inferior codegolfing skills, they sensed an opening: 
-
-"Hey Hamslaw, have you ever read War and Peace?"
-
-"Pfft, no one's *actually* read War and Peace."
-
-"Well I have, look it's right there in my bookcase, which *obviously* means I've read it."
-
-Hamslaw couldn't believe it. Her face shifted from its usual smug demeanor to an iron mask of rage and determination. Hamslaw pushed Michiel aside and power-walked to the book shelf, cleaving the tome from its resting place with the fury of a thousand Valkyries. She turned the ancient text over in her hands, and the instant she saw the cover she began to shake.
-
-Michiel prepared to boast of their clearly unparalleled brilliance, but was interrupted by the sudden laughter of Hamslaw.
-
-"This isn't War and Peace, this is War and *Feet*!"
-
-Tears were rolling down Hamslaw's face. This was clearly the greatest moment of her life.
-
-"N-no! I just looked at it!"
-
-They grabbed the book from Hamslaw and checked the cover. Indeed, the word "Peace" had been scratched out and replaced with "Feet". Michiel was mortified. This was clearly the worst moment of their life.
-
-They fell to their knees and stared blankly at the bookcase. How could this have happened? They had checked the cover only a moment ago!
-
-And then they saw a bit of motion in the bookcase. It was a tiny man. A tiny many with the angriest scowl Michiel had ever seen. The tiny man flipped Michiel off and mouthed the words "no one will believe you" and disappeared back between the books.
-
-Michiel's plan *had* been perfect, but they had failed to account for the possibility of a tiny angry man with a sharpie and the desire for destruction. They thought they knew what the cover of the book said, and they thought that no one could have possibly changed it. But alas, they were wrong.
-
-Hamslaw was already working on a zine commemorating her incredible victory &mdash; Michiel's reputation at the local Internet Cafe would never recover.
+Чтобы понять, почему информация об алиасинге указателей важна, давайте рассмотрим *Притчу о маленьком злом человечке*.
 
 ----
 
-No one wants to be like Michiel, but no one wants to live in constant fear of the tiny angry man either. We want to know when the tiny angry man could be playing tricks on us. When he is, we will be very careful and paranoid about checking everything before we use it. But when the tiny angry man is gone, we want to be able to remember things.
+Однажды Михил (Michiel) просматривал свою книжную полку и увидел книгу, которую не помнил. Он вытащил ее из шкафа и посмотрел на обложку.
 
-That's the (very simplified) crux of pointer aliasing: when can the compiler assume it's safe to "remember" (cache) values instead of loading them over and over? To know that, the compiler needs to know whenever there *could* be little angry men mutating the memory behind your back.
+«О да, мой старый экземпляр *„Войны и мира“*, книга, которую я определенно читал. Мне очень понравилась часть со всем этим Миром».
 
-> **NARRATOR:** the compiler also uses this information to cache stores, which just means it can avoid committing things to memory if it thinks no one will notice. In this case the problem is still tiny angry men, but they only need to read the memory for it to be a problem.
+Внезапно в дверь постучали. Михил вернул книгу на полку и открыл дверь — это был его заклятый враг **Хамслоу (Hamslaw)**. Пока Хамслоу готовила сокрушительное замечание о явно уступающих навыках Михила в код-гольфе, они почувствовали возможность:
+
+«Эй, Хамслоу, ты когда-нибудь читала „Войну и мир“?»
+
+«Пффф, никто на самом деле не читал „Войну и мир“».
+
+«Ну, а я читал, вот она прямо там, в моем книжном шкафу, что *очевидно* означает, что я ее читал».
+
+Хамслоу не могла в это поверить. Ее лицо сменилось с обычного самодовольного выражения на железную маску ярости и решимости. Хамслоу оттолкнула Михила и решительно зашагала к книжной полке, вырвав том из его пристанища с яростью тысячи Валькирий. Она перевернула древний текст в своих руках, и в тот момент, когда она увидела обложку, ее начало трясти.
+
+Михил приготовился хвастаться своим явно непревзойденным блеском, но был прерван внезапным смехом Хамслоу.
+
+«Это не „Война и мир“, это „Война и *Ноги*“ (War and Feet)!»
+
+Слезы катились по лицу Хамслоу. Это был, явно, величайший момент в ее жизни.
+
+«Н-нет! Я только что смотрел на нее!»
+
+Они выхватили книгу у Хамслоу и проверили обложку. Действительно, слово «Мир» (Peace) было зачеркнуто и заменено на «Ноги» (Feet). Михил был смертельно уязвлен. Это был, явно, худший момент в его жизни.
+
+Он упал на колени и тупо уставился на книжный шкаф. Как такое могло произойти? Он ведь проверял обложку всего мгновение назад!
+
+И тут он заметил какое-то движение в книжном шкафу. Это был маленький человечек. Маленький человечек с самой злобной гримасой, которую Михил когда-либо видел. Маленький человечек показал Михилу средний палец, беззвучно произнес «тебе никто не поверит» и снова исчез между книгами.
+
+План Михила *был* идеален, но он не учел возможность появления маленького злого человечка с маркером и жаждой разрушения. Он думал, что знает, что написано на обложке книги, и думал, что никто не мог ее изменить. Но увы, он ошибся.
+
+Хамслоу уже работала над зином, посвященным ее невероятной победе — репутация Михила в местном интернет-кафе уже никогда не восстановится.
+
+----
+
+Никто не хочет быть похожим на Михила, но никто и не хочет жить в постоянном страхе перед маленьким злым человечком. Мы хотим знать, когда маленький злой человечек может сыграть с нами злую шутку. Когда он это делает, мы будем очень осторожны и параноидально проверять всё перед использованием. Но когда маленького злого человечка нет, мы хотим иметь возможность помнить вещи.
+
+В этом и заключается (в очень упрощенном виде) суть алиасинга указателей: когда компилятор может предположить, что безопасно «помнить» (кэшировать) значения вместо того, чтобы загружать их снова и снова? Чтобы знать это, компилятор должен знать, когда за вашей спиной могут быть маленькие злые человечки, изменяющие память.
+
+> **РАССКАЗЧИК (NARRATOR):** компилятор также использует эту информацию для кэширования записей, что просто означает, что он может избежать фиксации изменений в памяти, если думает, что никто этого не заметит. В этом случае проблема по-прежнему заключается в маленьких злых человечках, но им нужно только прочитать память, чтобы это стало проблемой.
 
 
 
 
 
 
-# Safe Stacked Borrows
+# Безопасный Stacked Borrows
 
-Ok so we want the compiler to have good pointer aliasing information, can we do that? Well, seemingly Rust is *designed* for it. Mutable references aren't aliased by definition, and although shared references *can* alias eachother, they can't mutate. Perfect! Ship it!
+Итак, мы хотим, чтобы у компилятора была хорошая информация об алиасинге указателей, можем ли мы это сделать? Ну, судя по всему, Rust *создан* для этого. Изменяемые ссылки не алиасят по определению, и хотя разделяемые ссылки *могут* алиасить друг друга, они не могут изменять данные. Идеально! В продакшн!
 
-Except it's more complicated than that. We can "reborrow" mutable pointers like this:
+За исключением того, что всё сложнее. Мы можем «перезаимствовать» (reborrow) изменяемые указатели следующим образом:
 
 ```rust
 let mut data = 10;
@@ -86,16 +88,16 @@ let ref2 = &mut *ref1;
 println!("{}", data);
 ```
 
-The compiles and runs fine. What's the deal? 
+Это компилируется и работает нормально. В чем же дело?
 
-Well we can see what's going on by swapping the two uses:
+Ну, мы можем увидеть, что происходит, если поменять местами эти два использования:
 
 ```rust ,ignore
 let mut data = 10;
 let ref1 = &mut data;
 let ref2 = &mut *ref1;
 
-// ORDER SWAPPED!
+// ПОРЯДОК ИЗМЕНЕН!
 *ref1 += 1;
 *ref2 += 2;
 
@@ -118,27 +120,27 @@ For more information about this error, try `rustc --explain E0503`.
 error: could not compile `playground` due to previous error
 ```
 
-It's suddenly a compiler error!
+Внезапно это ошибка компилятора!
 
-When we reborrow a mutable pointer, the original pointer can't be used anymore until the borrower is done with it (no more uses). 
+Когда мы перезаимствуем изменяемый указатель, исходный указатель больше нельзя использовать, пока заемщик не закончит с ним работу (больше не будет его использовать).
 
-In the code that works, there's a nice little nesting of the uses. We reborrow the pointer, use the new pointer for a while, and then stop using it before using the older pointer again. In the code that *doesn't* work, that doesn't happen. We just interleave the uses arbitrarily.
+В коде, который работает, есть хорошая вложенность использований. Мы перезаимствуем указатель, используем новый указатель какое-то время, а затем прекращаем его использовать перед тем, как снова использовать старый указатель. В коде, который *не* работает, этого не происходит. Мы просто чередуем использования произвольным образом.
 
-This is how we can have reborrows and still have aliasing information: all of our reborrows clearly nest, so we can consider only one of them "live" at any given time.
+Вот как мы можем иметь перезаимствования и при этом сохранять информацию об алиасинге: все наши перезаимствования явно вложены друг в друга, поэтому мы можем считать только одно из них «живым» в любой момент времени.
 
-Hey, you know what's a great way to represent cleanly nested things? A stack. A stack of borrows.
+Эй, а вы знаете, какой отличный способ представить чисто вложенные вещи? Стек. Стек заимствований (borrow stack).
 
-Oh hey it's *Stacked Borrows*!
+О, привет, это же *Stacked Borrows*!
 
-Whatever's at the top of the borrow stack is "live" and knows it's effectively unaliased. When you reborrow a pointer, the new pointer is pushed onto the stack, becoming *the* live pointer. When you use an older pointer it's brought back to life by popping everything on the borrow stack above it. At this point the pointer "knows" it was reborrowed and that the memory might have been modified, but that it once more has exclusive access -- no need to worry about little angry men.
+Всё, что находится на вершине стека заимствований, является «живым» и знает, что оно фактически не алиасено. Когда вы перезаимствуете указатель, новый указатель проталкивается в стек, становясь *тем самым* живым указателем. Когда вы используете более старый указатель, он возвращается к жизни путем выталкивания всего, что находится в стеке заимствований выше него. В этот момент указатель «знает», что он был перезаимствован и что память могла быть изменена, но что у него снова есть эксклюзивный доступ — не нужно беспокоиться о маленьких злых человечках.
 
-So it's actually *always* ok to access a reborrowed pointer, because we can always pop everything above it. The real trouble is accessing a pointer that has already been popped off of the borrow stack -- then you've messed up.
+Так что на самом деле *всегда* можно получить доступ к перезаимствованному указателю, потому что мы всегда можем вытолкнуть всё, что находится выше него. Реальная проблема — это доступ к указателю, который уже был вытолкнут из стека заимствований — тогда вы облажались.
 
-Thankfully the design of the borrowchecker ensures that safe Rust programs follow these rules, as we saw in the above example, but the compiler generally views this problem "backwards" from the stacked borrows perspective. Instead of saying using `ref1` invalidates `ref2`, it insists that `ref2` *must* be valid for all its uses, and that `ref1` is the one messing things up by going out of turn.
+К счастью, дизайн borrowchecker'а гарантирует, что безопасные программы на Rust следуют этим правилам, как мы видели в примере выше, но компилятор обычно смотрит на эту проблему «задом наперед» с точки зрения stacked borrows. Вместо того чтобы говорить, что использование `ref1` делает `ref2` невалидным, он настаивает на том, что `ref2` *должен* быть валиден для всех своих использований, и что `ref1` — это тот, кто всё портит, влезая без очереди.
 
-Hence "cannot use `*ref1` because it was mutably borrowed". It's the same result (especially with non-lexical lifetimes), but framed in a way that's probably more intuitive.
+Отсюда «cannot use `*ref1` because it was mutably borrowed» (нельзя использовать `*ref1`, потому что он был изменяемо заимствован). Это тот же результат (особенно с нелексическими временами жизни), но сформулированный таким образом, который, вероятно, более интуитивен.
 
-But the borrowchecker can't help us when we start using unsafe pointers!
+Но borrowchecker не может помочь нам, когда мы начинаем использовать небезопасные указатели!
 
 
 
@@ -146,66 +148,64 @@ But the borrowchecker can't help us when we start using unsafe pointers!
 
 # Unsafe Stacked Borrows
 
-So we want to somehow have a way for unsafe pointers to participate in this stacked borrows system, even though the compiler can't track them properly. And we also want the system to be fairly permissive so that it's not *too* easy to mess it up and cause UB.
+Итак, мы хотим каким-то образом иметь возможность для небезопасных указателей участвовать в этой системе stacked borrows, даже если компилятор не может отслеживать их должным образом. И мы также хотим, чтобы система была достаточно разрешительной, чтобы ее было не *слишком* легко сломать и вызвать UB.
 
-That's a hard problem, and I don't know how to solve it, but the folks who worked on Stacked Borrows came up with something plausible, and miri tries to implement it.
+Это сложная проблема, и я не знаю, как ее решить, но люди, работавшие над Stacked Borrows, придумали что-то правдоподобное, и Miri пытается это реализовать.
 
-The very high-level concept is that when you convert a reference (or any other safe pointer) into an raw pointer it's *basically* like taking a reborrow. So now the raw pointer is allowed to do whatever it wants with that memory, and when the reborrow expires it's just like when that happens with normal reborrows.
+Высокоуровневая концепция заключается в том, что когда вы преобразуете ссылку (или любой другой безопасный указатель) в сырой указатель, это *по сути* похоже на взятие перезаимствования. Таким образом, теперь сырому указателю разрешено делать всё, что он хочет с этой памятью, и когда срок действия перезаимствования истекает, это происходит так же, как и с обычными перезаимствованиями.
 
-But the question is, when does that reborrow expire? Well, probably a good time to expire it is when you start using the original reference again. Otherwise things aren't a nice nested stack.
+Но вопрос в том, когда истекает срок действия этого перезаимствования? Ну, вероятно, хорошее время для его прекращения — это когда вы снова начнете использовать исходную ссылку. В противном случае вещи не образуют красивый вложенный стек.
 
-But wait, you can turn a raw pointer *into* a reference! And you can copy raw pointers! What if you go `&mut -> *mut -> &mut -> *mut` and then access the first `*mut`? How the heck do the stacked borrows work then?
+Но подождите, вы можете превратить сырой указатель *в* ссылку! И вы можете копировать сырые указатели! Что, если вы пойдете по цепочке `&mut -> *mut -> &mut -> *mut`, а затем обратитесь к первому `*mut`? Как, черт возьми, тогда работают stacked borrows?
 
-I genuinely don't know! That's why things are complicated. In fact they're *extra* complicated because stacked borrows are *trying* to be more permissive and let more unsafe code work the way you'd expect it to. This is why I run things under miri to try to help me catch mistakes.
+Я искренне не знаю! Вот почему всё так сложно. На самом деле всё *еще более* сложно, потому что stacked borrows *пытаются* быть более разрешительными и позволять большему количеству небезопасного кода работать так, как вы от него ожидаете. Вот почему я запускаю код под Miri, чтобы помочь себе отловить ошибки.
 
-In fact, this messiness is why there is an extra-experimental extra-strict mode of miri: `-Zmiri-tag-raw-pointers`.
+На самом деле, эта запутанность является причиной того, что в Miri есть экспериментальный сверхстрогий режим: `-Zmiri-tag-raw-pointers`.
 
-To enable it, we need to pass it via a MIRIFLAGS environment variable like this:
+Чтобы включить его, нам нужно передать его через переменную окружения `MIRIFLAGS` следующим образом:
 
 ```text
 MIRIFLAGS="-Zmiri-tag-raw-pointers" cargo +nightly-2022-01-21 miri test
 ```
 
-Or like this on Windows, where you need to just set the variable globally:
+Или вот так на Windows, где вам нужно просто установить переменную глобально:
 
 ```text
 $env:MIRIFLAGS="-Zmiri-tag-raw-pointers"
 cargo +nightly-2022-01-21 miri test
 ```
 
-We'll generally be trying to conform to this extra-strict mode just to be *extra* confident in our work. It's also in some sense "simpler", so it's actually better for messing around and getting an intuition for stacked borrows.
+Мы обычно будем стараться соответствовать этому сверхстрогому режиму, просто чтобы быть *максимально* уверенными в своей работе. В некотором смысле он также «проще», поэтому он на самом деле лучше подходит для того, чтобы поиграться и получить интуитивное представление о stacked borrows.
 
 
 
 
-# Managing Stacked Borrows
+# Управление Stacked Borrows
 
-So when using raw pointers we're going to try to stick to a heuristic that's simple and blunt and will hopefully have a large margin of error: 
+Поэтому при использовании сырых указателей мы попытаемся придерживаться эвристики, которая проста, груба и, будем надеяться, имеет большой запас прочности:
 
-**Once you start using raw pointers, try to ONLY use raw pointers.**
+**Как только вы начнете использовать сырые указатели, старайтесь использовать ТОЛЬКО сырые указатели.**
 
-This makes it as unlikely as possible to accidentally lose the raw pointer's "permission" to access the memory.
+Это делает максимально маловероятным случайную потерю «разрешения» сырого указателя на доступ к памяти.
 
-> **NARRATOR:** this is oversimplified in two regards:
+> **РАССКАЗЧИК (NARRATOR):** это слишком упрощено в двух отношениях:
 >
-> 1. Safe pointers often assert more properties than just aliasing: the memory is allocated, it's aligned, it's large enough to fit the type of the pointee, the pointee is properly initialized, etc. So it's even more dangerous to wildly throw them around when things are in a dubious state.
+> 1. Безопасные указатели часто утверждают больше свойств, чем просто алиасинг: память выделена, она выровнена, она достаточно велика, чтобы вместить тип указуемого объекта, объект правильно инициализирован и т.д. Поэтому еще более опасно дико разбрасываться ими, когда дела находятся в сомнительном состоянии.
 >
-> 2. Even if you stay in raw pointer land, you can't just wildly alias any memory. Pointers are conceptually tied to specific "allocations" (which can be as granular as a local variable on the stack), and you're not supposed to take a pointer from one allocation, offset it, and then access memory in a different allocation. If this was allowed, there would *always* be the threat of tiny angry men *everywhere*. This is part of the reason "pointers are just integers" is a *problematic* viewpoint.
+> 2. Даже если вы остаетесь в стране сырых указателей, вы не можете просто так дико алиасить любую память. Указатели концептуально привязаны к конкретным «выделениям» (allocations) (которые могут быть такими же гранулярными, как локальная переменная в стеке), и вы не должны брать указатель из одного выделения, смещать его и затем обращаться к памяти в другом выделении. Если бы это было разрешено, *всегда* существовала бы угроза маленьких злых человечков *повсюду*. Это одна из причин, почему точка зрения «указатели — это просто целые числа» является *проблематичной*.
 
-Now, we still want safe references in our *interface*, because we want to build a nice *safe abstraction* so the user of our list doesn't have to know or worry about. 
+Тем не менее, мы всё еще хотим иметь безопасные ссылки в нашем *интерфейсе*, потому что мы хотим построить хорошую *безопасную абстракцию*, чтобы пользователю нашего списка не нужно было ничего знать или беспокоиться.
 
-So what we're going to do is:
+Поэтому мы сделаем следующее:
 
-1. At the start of a method, use the input references to get our raw pointers
-2. Do our best to only use unsafe pointers from this point on
-3. Convert our raw pointers back to safe pointers at the end if needed
+1. В начале метода используем входные ссылки для получения наших сырых указателей.
+2. С этого момента делаем всё возможное, чтобы использовать только небезопасные указатели.
+3. В конце преобразуем наши сырые указатели обратно в безопасные ссылки, если это необходимо.
 
-But the fields of our types are private so we're going to keep those *entirely* as raw pointers.
+Но поля наших типов являются приватными, поэтому мы будем хранить их *полностью* как сырые указатели.
 
-In fact, part of the big mistake we made was continuing to use Box! Box has a special annotation in it that tells the compiler "hey this is a lot like `&mut`, because it uniquely owns that pointer". Which is true!
+На самом деле, часть большой ошибки, которую мы совершили, заключалась в том, что мы продолжали использовать `Box`! `Box` содержит специальную аннотацию, которая говорит компилятору: «эй, это очень похоже на `&mut`, потому что он уникально владеет этим указателем». И это правда!
 
-But the raw pointer we were keeping to the end of the list was pointing into a Box, so whenever we access the Box normally we're probably invalidating that raw pointer's "reborrow"! ☠
+Но сырой указатель, который мы хранили для конца списка, указывал *внутрь* `Box`, поэтому всякий раз, когда мы обращаемся к `Box` обычным образом, мы, вероятно, инвалидируем «перезаимствование» этого сырого указателя! ☠
 
-In the next section we'll return to our true form and hit our heads against a bunch of examples.
-
-
+В следующем разделе мы вернемся к нашей истинной форме и будем биться головой об кучу примеров.
